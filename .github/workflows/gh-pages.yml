@@ -1,20 +1,16 @@
 name: GitHub Pages
-
 on:
   push:
-    branches: [ "v0.0.9-docs" ]
-
+    branches: ["v0.0.9-docs"]
 # Concurrency control to prevent parallel runs on the same PR
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
-
 permissions:
   contents: write
   pull-requests: write
   checks: write
   issues: read
-
 jobs:
   deploy_docs:
     name: Deploy the docs
@@ -35,7 +31,6 @@ jobs:
           clean: true
           fetch-depth: 0
           fetch-tags: true
-
       # Build docs
       - name: Build docs
         run: |
@@ -43,7 +38,6 @@ jobs:
           pip3 install -r requirements.txt
           make SPHINXOPTS=-W multi-docs
           touch ./_build/.nojekyll
-
       # Deploy to gh-pages
       - name: Deploy to gh-pages
         uses: peaceiris/actions-gh-pages@v3
