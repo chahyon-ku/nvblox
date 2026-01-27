@@ -17,28 +17,18 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      # - name: Install git LFS (and tools needed by hooks)
-      #   run: |
-      #     apt-get update
-      #     apt-get install -y --no-install-recommends git git-lfs clang-format ca-certificates make
-      #     git --version
-      #     git lfs version
-
-      # Checkout Code
       - name: Checkout Code
         uses: actions/checkout@v4
         with:
           clean: true
           fetch-depth: 0
           fetch-tags: true
-      # Build docs
       - name: Build docs
         run: |
           cd docs
           pip3 install -r requirements.txt
           make SPHINXOPTS=-W multi-docs
           touch ./_build/.nojekyll
-      # Deploy to gh-pages
       - name: Deploy to gh-pages
         uses: peaceiris/actions-gh-pages@v3
         with:
