@@ -18,6 +18,7 @@
 #include "nvblox_torch/check_utils.h"
 #include "nvblox_torch/cuda_stream.h"
 #include "nvblox_torch/py_mapper.h"
+#include "nvblox_torch/py_sensor.h"
 #include "nvblox_torch/sdf_query.cuh"
 
 namespace pynvblox {
@@ -83,14 +84,30 @@ c10::intrusive_ptr<MapperParams> Mapper::getMapperParams() {
   return mapper_params_;
 }
 
+// Template helper for depth integration with any sensor type
+template <typename SensorType>
+void integrateDepthWithSensorType(std::shared_ptr<nvblox::Mapper> mapper,
+                                  torch::Tensor depth_frame_t,
+                                  torch::Tensor T_L_C_t,
+                                  const SensorType& sensor,
+                                  std::optional<torch::Tensor> mask_frame_t) {
+  nvblox::Transform T_L_C = copy_transform_from_tensor(T_L_C_t);
+
+  mapper->integrateDepth(
+      masked_view_from_tensor<const float>(depth_frame_t, mask_frame_t), T_L_C,
+      sensor);
+}
+
+// Unified depth integration entry point
 void Mapper::integrateDepth(torch::Tensor depth_frame_t, torch::Tensor T_L_C_t,
-                            torch::Tensor intrinsics_t,
+                            c10::intrusive_ptr<PySensor> sensor,
                             std::optional<torch::Tensor> mask_frame_t,
                             long mapper_id) {
   CHECK_LT(mapper_id, static_cast<int>(mappers_.size()));
   ALL_ON_GPU_OR_RETURN(depth_frame_t, mask_frame_t);
-  if (!checkSizes(T_L_C_t, {4, 4}) || !checkSizes(intrinsics_t, {3, 3})) {
-    LOG(WARNING) << "Pose and intrinsics tensor sizes are not correct";
+
+  if (!checkSizes(T_L_C_t, {4, 4})) {
+    LOG(WARNING) << "Pose tensor size is not correct";
     return;
   }
   if (mask_frame_t.has_value() &&
@@ -101,26 +118,45 @@ void Mapper::integrateDepth(torch::Tensor depth_frame_t, torch::Tensor T_L_C_t,
 
   auto mapper = mappers_[mapper_id];
 
-  int height = depth_frame_t.sizes()[0];
-  int width = depth_frame_t.sizes()[1];
-
-  nvblox::Transform T_L_C = copy_transform_from_tensor(T_L_C_t);
-  nvblox::Camera camera =
-      camera_from_intrinsics_tensor(intrinsics_t, height, width);
-
-  mapper->integrateDepth(
-      masked_view_from_tensor<const float>(depth_frame_t, mask_frame_t), T_L_C,
-      camera);
+  // Dispatch based on sensor type stored in TypeIndexedStore
+  if (sensor->isSensorType<nvblox::Camera>()) {
+    integrateDepthWithSensorType(mapper, depth_frame_t, T_L_C_t,
+                                 sensor->getNvbloxSensor<nvblox::Camera>(),
+                                 mask_frame_t);
+  } else if (sensor->isSensorType<nvblox::Lidar>()) {
+    integrateDepthWithSensorType(mapper, depth_frame_t, T_L_C_t,
+                                 sensor->getNvbloxSensor<nvblox::Lidar>(),
+                                 mask_frame_t);
+  } else {
+    LOG(ERROR) << "Unknown sensor type in integrateDepth. Supported sensor "
+                  "types are Camera and Lidar.";
+  }
 }
 
+// Template helper for color integration with any sensor type (Camera only)
+template <typename SensorType>
+void integrateColorWithSensorType(std::shared_ptr<nvblox::Mapper> mapper,
+                                  torch::Tensor color_frame_t,
+                                  torch::Tensor T_L_C_t,
+                                  const SensorType& sensor,
+                                  std::optional<torch::Tensor> mask_frame_t) {
+  nvblox::Transform T_L_C = copy_transform_from_tensor(T_L_C_t);
+
+  mapper->integrateColor(
+      masked_view_from_tensor<const nvblox::Color>(color_frame_t, mask_frame_t),
+      T_L_C, sensor);
+}
+
+// Unified color integration entry point
 void Mapper::integrateColor(torch::Tensor color_frame_t, torch::Tensor T_L_C_t,
-                            torch::Tensor intrinsics_t,
+                            c10::intrusive_ptr<PySensor> sensor,
                             std::optional<torch::Tensor> mask_frame_t,
                             long mapper_id) {
   CHECK_LT(mapper_id, static_cast<int>(mappers_.size()));
   ALL_ON_GPU_OR_RETURN(color_frame_t, mask_frame_t);
-  if (!checkSizes(T_L_C_t, {4, 4}) || !checkSizes(intrinsics_t, {3, 3})) {
-    LOG(WARNING) << "Pose and intrinsics tensor sizes are not correct";
+
+  if (!checkSizes(T_L_C_t, {4, 4})) {
+    LOG(WARNING) << "Pose tensor size is not correct";
     return;
   }
   if (mask_frame_t.has_value() &&
@@ -129,30 +165,45 @@ void Mapper::integrateColor(torch::Tensor color_frame_t, torch::Tensor T_L_C_t,
     return;
   }
 
-  auto mapper = mappers_[mapper_id];
-
-  const int height = color_frame_t.sizes()[0];
-  const int width = color_frame_t.sizes()[1];
   const int num_channels = color_frame_t.sizes()[2];
   CHECK_EQ(num_channels, nvblox::kRgbNumElements);
-  nvblox::Transform T_L_C = copy_transform_from_tensor(T_L_C_t);
-  nvblox::Camera camera =
-      camera_from_intrinsics_tensor(intrinsics_t, height, width);
 
-  mapper->integrateColor(
-      masked_view_from_tensor<const nvblox::Color>(color_frame_t, mask_frame_t),
-      T_L_C, camera);
+  auto mapper = mappers_[mapper_id];
+
+  // Only Camera supports color integration
+  if (sensor->isSensorType<nvblox::Camera>()) {
+    integrateColorWithSensorType(mapper, color_frame_t, T_L_C_t,
+                                 sensor->getNvbloxSensor<nvblox::Camera>(),
+                                 mask_frame_t);
+  } else {
+    LOG(ERROR) << "Color integration only supported for Camera sensors";
+  }
 }
 
+// Template helper for feature integration with any sensor type (Camera only)
+template <typename SensorType>
+void integrateFeaturesWithSensorType(
+    std::shared_ptr<nvblox::Mapper> mapper, torch::Tensor feature_frame_t,
+    torch::Tensor T_L_C_t, const SensorType& sensor,
+    std::optional<torch::Tensor> mask_frame_t) {
+  nvblox::Transform T_L_C = copy_transform_from_tensor(T_L_C_t);
+
+  mapper->integrateFeatures(masked_view_from_tensor<const nvblox::FeatureArray>(
+                                feature_frame_t, mask_frame_t),
+                            T_L_C, sensor);
+}
+
+// Unified feature integration entry point
 void Mapper::integrateFeatures(torch::Tensor feature_frame_t,
                                torch::Tensor T_L_C_t,
-                               torch::Tensor intrinsics_t,
+                               c10::intrusive_ptr<PySensor> sensor,
                                std::optional<torch::Tensor> mask_frame_t,
                                long mapper_id) {
   CHECK_LT(mapper_id, static_cast<int>(mappers_.size()));
   ALL_ON_GPU_OR_RETURN(feature_frame_t, mask_frame_t);
-  if (!checkSizes(T_L_C_t, {4, 4}) || !checkSizes(intrinsics_t, {3, 3})) {
-    LOG(WARNING) << "Pose and intrinsics tensor sizes are not correct";
+
+  if (!checkSizes(T_L_C_t, {4, 4})) {
+    LOG(WARNING) << "Pose tensor size is not correct";
     return;
   }
   if (mask_frame_t.has_value() &&
@@ -163,15 +214,14 @@ void Mapper::integrateFeatures(torch::Tensor feature_frame_t,
 
   auto mapper = mappers_[mapper_id];
 
-  int height = feature_frame_t.sizes()[0];
-  int width = feature_frame_t.sizes()[1];
-  nvblox::Transform T_L_C = copy_transform_from_tensor(T_L_C_t);
-  nvblox::Camera camera =
-      camera_from_intrinsics_tensor(intrinsics_t, height, width);
-
-  mapper->integrateFeatures(masked_view_from_tensor<const nvblox::FeatureArray>(
-                                feature_frame_t, mask_frame_t),
-                            T_L_C, camera);
+  // Only Camera supports feature integration
+  if (sensor->isSensorType<nvblox::Camera>()) {
+    integrateFeaturesWithSensorType(mapper, feature_frame_t, T_L_C_t,
+                                    sensor->getNvbloxSensor<nvblox::Camera>(),
+                                    mask_frame_t);
+  } else {
+    LOG(ERROR) << "Feature integration only supported for Camera sensors";
+  }
 }
 
 void Mapper::updateEsdf(long mapper_id) {

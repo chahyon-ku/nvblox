@@ -1,5 +1,5 @@
 /*
-Copyright 2022 NVIDIA CORPORATION
+Copyright 2025 NVIDIA CORPORATION
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@ limitations under the License.
 #include <memory>
 #include <string>
 
-#include "nvblox/datasets/data_loader.h"
+#include "nvblox/datasets/data_loader_interface.h"
 #include "nvblox/dynamics/dynamics_detection.h"
 #include "nvblox/gpu_hash/gpu_layer_view.h"
 #include "nvblox/integrators/esdf_integrator.h"
@@ -36,13 +36,16 @@ limitations under the License.
 #include "nvblox/mesh/mesh_block.h"
 #include "nvblox/mesh/mesh_integrator.h"
 #include "nvblox/rays/sphere_tracer.h"
+#include "nvblox/sensors/lidar.h"
 
 namespace nvblox {
 
+template <typename SensorType, typename SensorDataType>
 class Fuser {
  public:
   Fuser() = default;
-  Fuser(std::unique_ptr<datasets::RgbdDataLoaderInterface>&& data_loader,
+  Fuser(std::unique_ptr<datasets::DataLoaderInterface<
+            SensorType, SensorDataType>>&& data_loader,
         bool init_from_gflags);
 
   void initFromGflags();
@@ -79,9 +82,9 @@ class Fuser {
 
   // Getters for the loaded data and generated mesh.
   std::shared_ptr<const ColorImage> getColorFrame() const;
-  std::shared_ptr<const DepthImage> getDepthFrame() const;
-  std::shared_ptr<const Camera> getDepthCamera() const;
-  std::shared_ptr<const Transform> getDepthCameraPose() const;
+  std::shared_ptr<const SensorDataType> getSensorData() const;
+  std::shared_ptr<const SensorType> getSensor() const;
+  std::shared_ptr<const Transform> getSensorPose() const;
   std::shared_ptr<const Camera> getColorCamera() const;
   std::shared_ptr<const Transform> getColorCameraPose() const;
   std::shared_ptr<SerializedColorMeshLayer> getSerializedColorMesh() const;
@@ -96,7 +99,8 @@ class Fuser {
 
   // Dataset settings.
   int num_frames_to_integrate_ = std::numeric_limits<int>::max();
-  std::unique_ptr<datasets::RgbdDataLoaderInterface> data_loader_;
+  std::unique_ptr<datasets::DataLoaderInterface<SensorType, SensorDataType>>
+      data_loader_;
 
   // Temporal subsampling params
   int projective_frame_subsampling_ = 1;
@@ -106,6 +110,9 @@ class Fuser {
 
   // Param for dynamics
   nvblox::Time frame_period_ms_{33};  // 30 Hz
+
+  // LiDAR motion compensation
+  bool use_lidar_motion_compensation_ = true;
 
   // Output paths
   std::string timing_output_path_;
@@ -118,15 +125,23 @@ class Fuser {
   std::string dynamic_overlay_path_;
 
   // Buffers for the loaded data and generated mesh.
-  std::shared_ptr<Transform> T_L_D_ = std::make_shared<Transform>();
-  std::shared_ptr<Camera> depth_camera_ = std::make_shared<Camera>();
+  std::shared_ptr<Transform> T_L_S_ = std::make_shared<Transform>();
+  std::shared_ptr<SensorType> sensor_ = std::make_shared<SensorType>();
   std::shared_ptr<Transform> T_L_C_ = std::make_shared<Transform>();
   std::shared_ptr<Camera> color_camera_ = std::make_shared<Camera>();
-  std::shared_ptr<DepthImage> depth_frame_ =
-      std::make_shared<DepthImage>(MemoryType::kDevice);
+  std::shared_ptr<SensorDataType> sensor_data_ =
+      std::make_shared<SensorDataType>(MemoryType::kDevice);
   std::shared_ptr<ColorImage> color_frame_ =
       std::make_shared<ColorImage>(MemoryType::kDevice);
+  std::shared_ptr<Time> frame_timestamp_ms_from_dataset_ =
+      std::make_shared<Time>();
+  std::shared_ptr<Transform> T_L_S_scanEnd_ = std::make_shared<Transform>();
+  std::shared_ptr<Time> scan_duration_ms_ = std::make_shared<Time>();
   std::shared_ptr<SerializedColorMeshLayer> serialized_color_mesh_;
 };
+
+// Type aliases for common Fuser instantiations
+using CameraFuser = Fuser<Camera, DepthImage>;
+using LidarFuser = Fuser<Lidar, Pointcloud>;
 
 }  //  namespace nvblox

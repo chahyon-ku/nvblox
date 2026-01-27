@@ -33,6 +33,7 @@
 #include "nvblox_torch/py_layer.h"
 #include "nvblox_torch/py_mapper_params.h"
 #include "nvblox_torch/py_mesh.h"
+#include "nvblox_torch/py_sensor.h"
 
 namespace pynvblox {
 
@@ -43,19 +44,20 @@ struct Mapper : torch::CustomClassHolder {
 
   ~Mapper() = default;
 
+  // Sensor-based integration (unified entry point)
   void integrateDepth(torch::Tensor depth_frame_t, torch::Tensor T_L_C_t,
-                      torch::Tensor intrinsics_t,
+                      c10::intrusive_ptr<PySensor> sensor,
                       std::optional<torch::Tensor> mask_frame_t = std::nullopt,
                       long mapper_id = -1);
 
   void integrateColor(torch::Tensor color_frame_t, torch::Tensor T_L_C_t,
-                      torch::Tensor intrinsics_t,
+                      c10::intrusive_ptr<PySensor> sensor,
                       std::optional<torch::Tensor> mask_frame_t = std::nullopt,
                       long mapper_id = -1);
 
   void integrateFeatures(
       torch::Tensor feature_frame_t, torch::Tensor T_L_C_t,
-      torch::Tensor intrinsics_t,
+      c10::intrusive_ptr<PySensor> sensor,
       std::optional<torch::Tensor> mask_frame_t = std::nullopt,
       long mapper_id = -1);
 

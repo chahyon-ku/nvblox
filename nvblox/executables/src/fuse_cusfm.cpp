@@ -75,7 +75,7 @@ DEFINE_bool(fit_to_z0, false,
 namespace nvblox {
 
 bool Save2dOccupancyMap(const std::string& output_occupancy_map_path,
-                        Fuser& fuser) {
+                        CameraFuser& fuser) {
   // Grab an esdf slice and converts to 2d occupancy map
   nvblox::EsdfSlicer esdf_slicer;
 
@@ -145,7 +145,7 @@ int main(int argc, char* argv[]) {
     LOG(INFO) << "Z0 transform will be saved to: " << output_dir;
   }
 
-  std::unique_ptr<nvblox::Fuser> fuser =
+  std::unique_ptr<nvblox::CameraFuser> fuser =
       nvblox::datasets::cusfm_data::createFuser(
           FLAGS_color_image_dir, FLAGS_depth_image_dir, FLAGS_frames_meta_file,
           true /* init from gflags */, FLAGS_fit_to_z0, output_dir);

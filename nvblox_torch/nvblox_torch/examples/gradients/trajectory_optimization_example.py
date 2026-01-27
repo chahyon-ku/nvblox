@@ -199,6 +199,7 @@ def main(visualize: bool = True) -> int:
 
     print('Done')
     if visualize:
+        print('Close the visualize window to continue...')
         visualizer.run()
         visualizer.destroy_window()
 

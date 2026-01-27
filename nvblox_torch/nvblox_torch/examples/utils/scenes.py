@@ -12,11 +12,11 @@ from typing import Optional
 import math
 
 import torch
-from torch.utils.data.dataloader import DataLoader
 
 from nvblox_torch.datasets.sun3d_dataset import Sun3dDataset
 from nvblox_torch.mapper import Mapper
 from nvblox_torch.mapper_params import MapperParams, ProjectiveIntegratorParams, EsdfIntegratorParams
+from nvblox_torch.sensor import Sensor
 from nvblox_torch.scene import Scene
 
 
@@ -67,10 +67,8 @@ def get_sun3d_scene_mapper(dataset_path: str,
         Mapper: A mapper containing the scene.
     """
     # Create the dataset
-    dataloader = DataLoader(Sun3dDataset(root=dataset_path),
-                            batch_size=1,
-                            shuffle=False,
-                            num_workers=0)
+    dataloader = Sun3dDataset.create_dataloader(root_dir=dataset_path, sequence_name='seq-01')
+
     # Configure mapper parameters
     projective_integrator_params = ProjectiveIntegratorParams()
     projective_integrator_params.projective_integrator_max_integration_distance_m = 5.0
@@ -88,10 +86,10 @@ def get_sun3d_scene_mapper(dataset_path: str,
         depth: torch.Tensor = data['depth'][0].squeeze(-1)
         rgb: torch.Tensor = data['rgb'][0]
         pose: torch.Tensor = data['pose'][0].cpu()
-        intrinsics: torch.Tensor = data['intrinsics'][0]
+        sensor: Sensor = data['sensor'][0]
 
-        mapper.add_depth_frame(depth, pose, intrinsics)
-        mapper.add_color_frame(rgb, pose, intrinsics)
+        mapper.add_depth_frame(depth, pose, sensor)
+        mapper.add_color_frame(rgb, pose, sensor)
 
         if num_frames and idx > num_frames:
             break

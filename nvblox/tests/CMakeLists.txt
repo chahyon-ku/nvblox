@@ -116,11 +116,13 @@ add_nvblox_cpp_test(test_indexing)
 add_nvblox_cpp_test(test_interpolation_2d)
 add_nvblox_cpp_test(test_layer)
 add_nvblox_cpp_test(test_lidar)
+add_nvblox_cpp_test(test_lidarply)
 add_nvblox_cpp_test(test_lidar_integration)
 add_nvblox_cpp_test(test_mapper)
 add_nvblox_cpp_test(test_mesh_appearance)
 add_nvblox_cpp_test(test_mesh)
 add_nvblox_cpp_test(test_mesh_serializer)
+add_nvblox_cpp_test(test_ply_io)
 add_nvblox_cpp_test(test_nvtx_ranges)
 add_nvblox_cpp_test(test_occupancy_decay)
 add_nvblox_cpp_test(test_occupancy_integrator)
@@ -172,6 +174,7 @@ add_nvblox_cuda_test(test_device_function_utils)
 add_nvblox_cuda_test(test_zero_crossings_extractor)
 add_nvblox_cuda_test(test_error_check)
 add_nvblox_cuda_test(test_array)
+add_nvblox_cuda_test(test_lidar_motion_compensation)
 
 # The error check tests some scenarios that we're normally not going to
 # encounter. Relevant warnings are disabled
@@ -197,7 +200,7 @@ if(NOT USE_SANITIZER)
     add_nvblox_executable(
       run_memcpy_on_default_cuda_stream SOURCE_FILES
       run_memcpy_on_default_cuda_stream.cpp LINK_LIBRARIES_PUBLIC nvblox_lib)
-    add_test(test_default_stream_utilization
+    add_test(test_default_stream_utilization bash
              ${CMAKE_CURRENT_SOURCE_DIR}/check_default_stream_utilization.sh)
   endif(CMAKE_HOST_SYSTEM_PROCESSOR STREQUAL "x86_64")
 endif(NOT USE_SANITIZER)

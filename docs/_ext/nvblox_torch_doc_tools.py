@@ -32,6 +32,8 @@ def nvblox_torch_pip_install_code_block(app: Sphinx, _: Any, source: List[str]) 
             'wheel_name_ubuntu_22_cuda_12']
         wheel_name_ubuntu_22_cuda_11 = app.config.nvblox_torch_docs_config[
             'wheel_name_ubuntu_22_cuda_11']
+        wheel_name_ubuntu_24_cuda_13 = app.config.nvblox_torch_docs_config[
+            'wheel_name_ubuntu_24_cuda_13']
         if release_state:
             pip_install_target_ubuntu_24_cuda_12 = \
                 f'{external_wheel_base_url}/{wheel_name_ubuntu_24_cuda_12}'
@@ -39,6 +41,8 @@ def nvblox_torch_pip_install_code_block(app: Sphinx, _: Any, source: List[str]) 
                 f'{external_wheel_base_url}/{wheel_name_ubuntu_22_cuda_12}'
             pip_install_target_ubuntu_22_cuda_11 = \
                 f'{external_wheel_base_url}/{wheel_name_ubuntu_22_cuda_11}'
+            pip_install_target_ubuntu_24_cuda_13 = \
+                f'{external_wheel_base_url}/{wheel_name_ubuntu_24_cuda_13}'
         else:
             pip_install_target_ubuntu_24_cuda_12 = \
                 f'{internal_wheel_base_url}/{wheel_name_ubuntu_24_cuda_12}'
@@ -46,6 +50,8 @@ def nvblox_torch_pip_install_code_block(app: Sphinx, _: Any, source: List[str]) 
                 f'{internal_wheel_base_url}/{wheel_name_ubuntu_22_cuda_12}'
             pip_install_target_ubuntu_22_cuda_11 = \
                 f'{internal_wheel_base_url}/{wheel_name_ubuntu_22_cuda_11}'
+            pip_install_target_ubuntu_24_cuda_13 = \
+                f'{internal_wheel_base_url}/{wheel_name_ubuntu_24_cuda_13}'
         return f"""
 
 To install ``nvblox_torch`` via ``pip`` on a supported platform, run the following commands:
@@ -71,6 +77,14 @@ To install ``nvblox_torch`` via ``pip`` on a supported platform, run the followi
 
             sudo apt-get install python3-pip libglib2.0-0 libgl1 # Open3D dependencies
             pip3 install {pip_install_target_ubuntu_22_cuda_11}
+
+    .. tab:: Ubuntu 24.04 + CUDA 13.0
+
+        .. code-block:: bash
+
+            sudo apt-get install python3-pip libglib2.0-0 libgl1 # Open3D dependencies
+            pip3 install torch torchvision --index-url https://download.pytorch.org/whl/cu130/torch/ torch==2.9.1+cu130
+            pip3 install {pip_install_target_ubuntu_24_cuda_13}
 
 """
 

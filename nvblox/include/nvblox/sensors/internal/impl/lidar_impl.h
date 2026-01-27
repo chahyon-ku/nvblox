@@ -35,7 +35,9 @@ Lidar::Lidar(int num_azimuth_divisions, int num_elevation_divisions,
     : num_azimuth_divisions_(num_azimuth_divisions),
       num_elevation_divisions_(num_elevation_divisions),
       min_valid_range_m_(min_valid_range_m),
-      min_valid_range_squared_m_(min_valid_range_m * min_valid_range_m) {
+      min_valid_range_squared_m_(min_valid_range_m * min_valid_range_m),
+      min_angle_below_zero_elevation_rad_(min_angle_below_zero_elevation_rad),
+      max_angle_above_zero_elevation_rad_(max_angle_above_zero_elevation_rad) {
   // Only positive range values are allowed
   NVBLOX_CHECK(min_valid_range_m_ > 0.f, "");
 
@@ -87,6 +89,14 @@ float Lidar::min_valid_range_m() const { return min_valid_range_m_; }
 float Lidar::vertical_fov_rad() const { return vertical_fov_rad_; }
 
 float Lidar::start_polar_angle_rad() const { return start_polar_angle_rad_; }
+
+float Lidar::min_angle_below_zero_elevation_rad() const {
+  return min_angle_below_zero_elevation_rad_;
+}
+
+float Lidar::max_angle_above_zero_elevation_rad() const {
+  return max_angle_above_zero_elevation_rad_;
+}
 
 int Lidar::numel() const {
   return num_azimuth_divisions_ * num_elevation_divisions_;

@@ -74,7 +74,7 @@ void DepthImageBackProjector::backProjectOnGPU(
                         1);
   projectImageKernel<<<num_blocks, kThreadsPerThreadBlock, 0, *cuda_stream_>>>(
       sensor, image.dataConstPtr(), image.rows(), image.cols(),
-      max_back_projection_distance_m, pointcloud_C_ptr->dataPtr(),
+      max_back_projection_distance_m, pointcloud_C_ptr->pointsPtr(),
       pointcloud_size_device_.get());
   checkCudaErrors(cudaPeekAtLastError());
 

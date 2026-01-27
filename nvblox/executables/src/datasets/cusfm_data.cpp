@@ -631,18 +631,20 @@ namespace nvblox {
 namespace datasets {
 namespace cusfm_data {
 
-std::unique_ptr<Fuser> createFuser(const std::string& color_image_dir,
-                                   const std::string& depth_image_dir,
-                                   const std::string& frames_meta_file,
-                                   bool init_from_gflags, bool fit_to_z_plane,
-                                   const std::string& output_dir) {
+std::unique_ptr<CameraFuser> createFuser(const std::string& color_image_dir,
+                                         const std::string& depth_image_dir,
+                                         const std::string& frames_meta_file,
+                                         bool init_from_gflags,
+                                         bool fit_to_z_plane,
+                                         const std::string& output_dir) {
   auto data_loader = DataLoader::create(
       color_image_dir, depth_image_dir, frames_meta_file,
       false /* if use multithread*/, fit_to_z_plane, output_dir);
   if (!data_loader) {
-    return std::unique_ptr<Fuser>();
+    return std::unique_ptr<CameraFuser>();
   }
-  return std::make_unique<Fuser>(std::move(data_loader), init_from_gflags);
+  return std::make_unique<CameraFuser>(std::move(data_loader),
+                                       init_from_gflags);
 }
 
 std::unique_ptr<DataLoader> DataLoader::create(
@@ -819,12 +821,10 @@ DataLoadResult DataLoader::loadNext(DepthImage* depth_frame_ptr,
   return DataLoadResult::kSuccess;
 }
 
-DataLoadResult DataLoader::loadNext(DepthImage* depth_frame_ptr,
-                                    Transform* T_L_D_ptr,
-                                    Camera* depth_camera_ptr,
-                                    ColorImage* color_frame_ptr,
-                                    Transform* T_L_C_ptr,
-                                    Camera* color_camera_ptr) {
+DataLoadResult DataLoader::loadNext(
+    DepthImage* depth_frame_ptr, Transform* T_L_D_ptr, Camera* depth_camera_ptr,
+    ColorImage* color_frame_ptr, Transform* T_L_C_ptr, Camera* color_camera_ptr,
+    Time*, Transform*, Time*) {
   // NOTE: The other pointers are checked non-null below
   CHECK_NOTNULL(color_frame_ptr);
   CHECK_NOTNULL(T_L_C_ptr);

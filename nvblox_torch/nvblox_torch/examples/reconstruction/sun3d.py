@@ -14,12 +14,12 @@ from typing import Optional, Dict
 import pathlib
 import argparse
 import torch
-from torch.utils.data.dataloader import DataLoader
 import sys
 
 from nvblox_torch.datasets.sun3d_dataset import Sun3dDataset
 from nvblox_torch.mapper import Mapper
 from nvblox_torch.mapper_params import MapperParams, ProjectiveIntegratorParams
+from nvblox_torch.sensor import Sensor
 from nvblox_torch.examples.utils.visualization import Visualizer
 from nvblox_torch.examples.utils.feature_extraction import RadioFeatureExtractor
 
@@ -46,6 +46,10 @@ def parse_args() -> argparse.Namespace:
                         type=pathlib.Path,
                         required=True,
                         help='Path to the dataset/sequence root folder.')
+    parser.add_argument('--sequence_name',
+                        type=str,
+                        default='seq-01',
+                        help='Name of the sequence to reconstruct.')
     parser.add_argument(
         '--output_mesh_path',
         type=pathlib.Path,
@@ -78,18 +82,18 @@ def process_frame(idx: int,
     Args:
         idx: The frame index
         mapper: NVBlox mapper instance for 3D reconstruction
-        data: Dictionary containing frame data (depth, rgba, pose, intrinsics)
+        data: Dictionary containing frame data (depth, rgba, pose, sensor)
         feature_extractor: Optional feature extractor for computing visual features
         visualizer: Optional visualizer for displaying reconstruction
     """
     depth: torch.Tensor = data['depth'][0].squeeze(-1)
     rgb: torch.Tensor = data['rgb'][0]
     pose: torch.Tensor = data['pose'][0].cpu()
-    intrinsics: torch.Tensor = data['intrinsics'][0]
+    sensor: Sensor = data['sensor'][0]
 
     # Basic reconstruction
-    mapper.add_depth_frame(depth, pose, intrinsics)
-    mapper.add_color_frame(rgb, pose, intrinsics)
+    mapper.add_depth_frame(depth, pose, sensor)
+    mapper.add_color_frame(rgb, pose, sensor)
 
     # Only extract and add deep features to the reconstruction if requested.
     feature_mesh = None
@@ -98,7 +102,7 @@ def process_frame(idx: int,
         feature_frame = feature_extractor.compute(rgb)
         # nvblox accepts feature images of type float16, contiguous in memory.
         feature_frame = feature_frame.type(torch.float16).contiguous()
-        mapper.add_feature_frame(feature_frame, pose, intrinsics)
+        mapper.add_feature_frame(feature_frame, pose, sensor)
         mapper.update_feature_mesh()
         feature_mesh = mapper.get_feature_mesh()
 
@@ -123,10 +127,8 @@ def main() -> int:
     args = parse_args()
 
     # Create the dataset
-    dataloader = DataLoader(Sun3dDataset(root=args.dataset_path),
-                            batch_size=1,
-                            shuffle=False,
-                            num_workers=0)
+    dataloader = Sun3dDataset.create_dataloader(root_dir=args.dataset_path,
+                                                sequence_name=args.sequence_name)
 
     # Configure mapper parameters
     projective_integrator_params = ProjectiveIntegratorParams()

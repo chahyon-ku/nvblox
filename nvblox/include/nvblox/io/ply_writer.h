@@ -19,6 +19,7 @@ limitations under the License.
 #include <string>
 
 #include "nvblox/core/color.h"
+#include "nvblox/core/time.h"
 #include "nvblox/core/types.h"
 
 namespace nvblox {
@@ -39,6 +40,9 @@ class PlyWriter {
   void setIntensities(const std::vector<float>* intensities) {
     intensities_ = intensities;
   }
+  void setTimestamps(const std::vector<Time>* timestamps_ms) {
+    timestamps_ms_ = timestamps_ms;
+  }
   void setNormals(const std::vector<Vector3f>* normals) { normals_ = normals; }
   void setTriangles(const std::vector<int>* triangles) {
     triangles_ = triangles;
@@ -56,6 +60,7 @@ class PlyWriter {
   const std::vector<Vector3f>* points_ = nullptr;
   const std::vector<Vector3f>* normals_ = nullptr;
   const std::vector<float>* intensities_ = nullptr;
+  const std::vector<Time>* timestamps_ms_ = nullptr;
   const std::vector<Color>* colors_ = nullptr;
   const std::vector<int>* triangles_ = nullptr;
 

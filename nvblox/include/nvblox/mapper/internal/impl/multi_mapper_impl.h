@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+#include "nvblox/sensors/pointcloud_to_depth_conversion.h"
+
 namespace nvblox {
 
 template <typename SensorType>
@@ -25,7 +27,7 @@ void MultiMapper::integrateDepth(const DepthImage& depth_frame,
     // For static mapping only integrate to the background mapper
     background_mapper_->integrateDepth(depth_frame, T_L_CD, sensor);
   } else {
-    CHECK(update_time_ms);
+    CHECK(update_time_ms.has_value());
 
     // To speed-up execution, the functions called here are grouped into blocks
     // that can be launched in parallel without race conditions.
@@ -150,6 +152,29 @@ void MultiMapper::integrateDepth(const DepthImage& depth_frame,
                                      depth_sensor);
   foreground_mapper_->integrateDepth(depth_frame_foreground_, T_L_CD,
                                      depth_sensor);
+}
+
+template <typename SensorType>
+void MultiMapper::integrateDepth(const Pointcloud& pointcloud,
+                                 const Transform& T_L_S_scanStart,
+                                 const SensorType& lidar_sensor,
+                                 bool use_lidar_motion_compensation,
+                                 const std::optional<Transform>& T_L_S_scanEnd,
+                                 const std::optional<Time>& scan_duration_ms,
+                                 const std::optional<Time>& update_time_ms) {
+  CHECK(lidar_sensor.sensor_modality() == SensorModality::kLidar)
+      << "Pointcloud integration is only intended for lidar sensors";
+  // Direct pointcloud integration is not supported,
+  // therefore we convert the pointcloud to a spherical depth image first.
+  // During this conversion, we run motion compensation if enabled.
+  depthImageFromPointcloudGPU(pointcloud, T_L_S_scanStart, lidar_sensor,
+                              use_lidar_motion_compensation, T_L_S_scanEnd,
+                              scan_duration_ms, &depth_frame_from_pointcloud_,
+                              *cuda_stream_);
+
+  // Integrate the depth image.
+  integrateDepth(depth_frame_from_pointcloud_, T_L_S_scanStart, lidar_sensor,
+                 update_time_ms);
 }
 
 template <typename SensorType>

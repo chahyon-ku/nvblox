@@ -201,6 +201,10 @@ const Pointcloud& MultiMapper::getLastDynamicPointcloud() {
   return dynamic_detector_.getDynamicPointcloudDevice();
 }
 
+const DepthImage& MultiMapper::getLastDepthFrameFromPointcloud() {
+  return depth_frame_from_pointcloud_;
+}
+
 void MultiMapper::updateEsdfOfMapper(const std::shared_ptr<Mapper> mapper,
                                      std::optional<Plane> ground_plane) {
   switch (esdf_mode_) {

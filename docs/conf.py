@@ -156,11 +156,13 @@ nvblox_torch_docs_config = {
     'external_wheel_base_url': 'https://github.com/nvidia-isaac/nvblox/releases' + \
         f'/download/v{NVBLOX_VERSION_NUMBER}',
     'wheel_name_ubuntu_24_cuda_12': \
-        'nvblox_torch-0.0.8rc5+cu12ubuntu24-863-py3-none-linux_x86_64.whl',
+        'nvblox_torch-0.0.9.dev1+cu12ubuntu24-py3-none-linux_x86_64.whl',
     'wheel_name_ubuntu_22_cuda_12': \
-        'nvblox_torch-0.0.8rc5+cu12ubuntu22-863-py3-none-linux_x86_64.whl',
+        'nvblox_torch-0.0.9.dev1+cu12ubuntu22-py3-none-linux_x86_64.whl',
     'wheel_name_ubuntu_22_cuda_11': \
-        'nvblox_torch-0.0.8rc5+cu11ubuntu22-863-py3-none-linux_x86_64.whl',
+        'nvblox_torch-0.0.9.dev1+cu11ubuntu22-py3-none-linux_x86_64.whl',
+    'wheel_name_ubuntu_24_cuda_13': \
+        'nvblox_torch-0.0.9.dev1+cu13ubuntu24-py3-none-linux_x86_64.whl',
     'internal_git_url': 'ssh://git@gitlab-master.nvidia.com:12051/nvblox/nvblox.git',
     'external_git_url': 'git@github.com:nvidia-isaac/nvblox.git',
     'internal_code_link_base_url': 'https://gitlab-master.nvidia.com/nvblox/nvblox/-/tree/main',

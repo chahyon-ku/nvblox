@@ -72,6 +72,13 @@ DEFINE_double(
     "The frame rate of the input depth frames in Hz. Only used if running "
     "dynamic detection.");
 
+// LiDAR motion compensation
+DEFINE_bool(
+    use_lidar_motion_compensation, true,
+    "If set to true, apply motion compensation to LiDAR scans."
+    "This undistorts the scan by interpolating poses for each point based on "
+    "its timestamp.");
+
 // ============================ GET THE PARAMS ============================
 
 inline void get_global_params_from_gflags(float* voxel_size,
@@ -107,7 +114,9 @@ inline void get_global_params_from_gflags(float* voxel_size,
   }
 }
 
-inline void set_fuser_params_from_gflags(Fuser* fuser_ptr) {
+template <typename SensorType, typename SensorDataType>
+inline void set_fuser_params_from_gflags(
+    Fuser<SensorType, SensorDataType>* fuser_ptr) {
   // Dataset flags
   if (!gflags::GetCommandLineFlagInfoOrDie("num_frames").is_default) {
     LOG(INFO) << "Command line parameter found: num_frames = "
@@ -190,6 +199,14 @@ inline void set_fuser_params_from_gflags(Fuser* fuser_ptr) {
     constexpr int kSecondsToMilliSeconds = 1e3;
     fuser_ptr->frame_period_ms_ =
         nvblox::Time(kSecondsToMilliSeconds / FLAGS_frame_rate);
+  }
+  if (!gflags::GetCommandLineFlagInfoOrDie("use_lidar_motion_compensation")
+           .is_default) {
+    LOG(INFO) << "Command line parameter found: "
+                 "use_lidar_motion_compensation = "
+              << FLAGS_use_lidar_motion_compensation;
+    fuser_ptr->use_lidar_motion_compensation_ =
+        FLAGS_use_lidar_motion_compensation;
   }
 }
 
