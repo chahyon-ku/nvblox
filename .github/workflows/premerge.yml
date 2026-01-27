@@ -104,3 +104,23 @@ jobs:
           run-python-tests: false # TODO(dtingdahl) Enable these tests
           run-realsense-tests: false #
           run-cuda-sanitizer: false #
+  ## --------------------------------------------------------
+  ## Build docs
+  ## --------------------------------------------------------
+  build_docs:
+    name: Build docs
+    needs: [lint_precommit]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - name: Build docs
+        working-directory: ./docs
+        run: |
+          pip3 install -r requirements.txt
+          make html
+          touch ./_build/.nojekyll
