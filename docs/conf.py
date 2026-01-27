@@ -54,6 +54,7 @@ extensions = [
     'sphinx.ext.githubpages',
     'sphinx_tabs.tabs',
     'sphinx_copybutton',
+    "sphinx_multiversion",
     # TODO(alexmillane, 2025-04-24): Try re-enabling this once we have pydocs generating.
     #    'autodocsumm'
     'nvblox_torch_doc_tools'
@@ -114,6 +115,12 @@ html_theme_options = {
 # html_static_path = []
 html_static_path = ['_static']
 html_css_files = ['custom.css']
+
+# Versioning (sphinx-multiversion)
+smv_remote_whitelist = r"^.*$"
+smv_branch_whitelist = r"^(public|v0.0.8|v0.0.9)$"
+smv_tag_whitelist = r"^(v0.0.8|v0.0.9)$"
+html_sidebars = {"**": ["versioning.html", "sidebar-nav-bs"]}
 
 # Todos
 todo_include_todos = True

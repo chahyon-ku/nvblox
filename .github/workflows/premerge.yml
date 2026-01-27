@@ -109,7 +109,7 @@ jobs:
   ## --------------------------------------------------------
   build_docs:
     name: Build docs
-    needs: [lint_precommit]
+    # needs: [lint_precommit] # ADD BACK IN BEFORE MERGE
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
