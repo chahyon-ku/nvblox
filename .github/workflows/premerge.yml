@@ -122,5 +122,5 @@ jobs:
         working-directory: ./docs
         run: |
           pip3 install -r requirements.txt
-          make html
+          make multi-docs
           touch ./_build/.nojekyll
