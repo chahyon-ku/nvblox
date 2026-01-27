@@ -101,11 +101,11 @@ def install_pytorch_jetson() -> None:
 
 def install_nvblox_torch() -> None:
 
+    # For Jetson, we only support cuda12 (jetpack6).
     cuda_version = get_cuda_version()
-    if cuda_version not in JETSON_CUDA_VERSION_TO_TORCH:
-        print(
-            'warning: Unsupported CUDA version: {cuda_version}. Skipping nvblox torch installation.'
-        )
+    if platform.machine() == 'aarch64' and cuda_version not in JETSON_CUDA_VERSION_TO_TORCH:
+        print(f'warning: Unsupported CUDA version: {cuda_version}. '
+              'Skipping nvblox_torch installation.')
         return
 
     script = """
