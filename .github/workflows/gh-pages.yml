@@ -1,8 +1,7 @@
 name: GitHub Pages
 on:
   push:
-    branches: ["v0.0.9-docs"]
-# Concurrency control to prevent parallel runs on the same PR
+    branches: ["public"]
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
