@@ -118,8 +118,8 @@ html_css_files = ['custom.css']
 
 # Versioning (sphinx-multiversion)
 smv_remote_whitelist = r'^.*$'
-smv_branch_whitelist = r'^(public|v0.0.8|v0.0.9)$'
-smv_tag_whitelist = r'^(v0.0.8|v0.0.9)$'
+smv_branch_whitelist = r'^(public|v0.0.8-docs_test|v0.0.9-docs_test)$'
+smv_tag_whitelist = r'^(v0.0.8-docs_test|v0.0.9-docs_test)$'
 html_sidebars = {'**': ['versioning.html', 'sidebar-nav-bs']}
 
 # Todos

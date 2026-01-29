@@ -15,6 +15,7 @@ Depending on your use-case, you may interact with ``nvblox`` through either Pyth
 Quickstart
 ==========
 
+Current Version: :current_version_name:
 
 :nvblox_torch_pip_install_code_block:
 

@@ -162,9 +162,39 @@ def nvblox_code_link(app: Sphinx, _: Any, source: List[str]) -> None:
     source[0] = re.sub(r':nvblox_code_link:`<(?P<relative_path>.*)>`', replacer, source[0])
 
 
+def current_version_name(app: Sphinx, _: Any, source: List[str]) -> None:
+    """Replaces the :current_version_name: directive with the current version name.
+
+    This uses the sphinx-multiversion context if available, otherwise falls back
+    to the Sphinx version config value.
+
+    Usage in RST:
+        Current Version: :current_version_name:
+
+    """
+
+    def replacer(_: Any) -> str:
+        # Try to get the version from sphinx-multiversion's environment
+        # When sphinx-multiversion builds, it sets the 'smv_current_version' in the environment
+        smv_current_version = getattr(app.config, 'smv_current_version', None)
+        if smv_current_version:
+            return smv_current_version
+
+        # Fallback to the standard Sphinx version config
+        version = getattr(app.config, 'version', None)
+        if version:
+            return version
+
+        # Last resort fallback
+        return 'unknown'
+
+    source[0] = re.sub(r':current_version_name:', replacer, source[0])
+
+
 def setup(app: Sphinx) -> None:
     app.connect('source-read', nvblox_torch_pip_install_code_block)
     app.connect('source-read', nvblox_torch_git_clone_code_block)
     app.connect('source-read', nvblox_code_link)
     app.connect('source-read', download_test_dataset)
+    app.connect('source-read', current_version_name)
     app.add_config_value('nvblox_torch_docs_config', {}, 'env')
