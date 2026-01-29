@@ -18,12 +18,8 @@ from typing import List
 import os
 import sys
 
-# Modify PYTHONPATH so we can obtain the version data from setup module.
-# pylint: disable=wrong-import-position
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'nvblox_torch')))
-from setup import NVBLOX_VERSION_NUMBER
-
 # Modify PYTHONPATH so we can import the helpers module.
+# pylint: disable=wrong-import-position
 sys.path.insert(0, os.path.abspath('.'))
 from helpers import TemporaryLinkcheckIgnore, to_datetime, is_expired
 
@@ -89,7 +85,7 @@ nitpick_ignore: List[str] = []    # can exclude known bad refs
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 html_theme = 'nvidia_sphinx_theme'
-html_title = f'nvblox_torch {NVBLOX_VERSION_NUMBER}'
+html_title = 'nvblox'
 html_show_sphinx = False
 html_theme_options = {
     'copyright_override': {
@@ -158,18 +154,6 @@ for ignore in temporary_linkcheck_ignore:
 
 nvblox_torch_docs_config = {
     'released': released,
-    'internal_wheel_base_url': 'https://urm.nvidia.com/artifactory/hw-nvblox-alpine-local/' + \
-        'pypi/release/nvblox_torch/',
-    'external_wheel_base_url': 'https://github.com/nvidia-isaac/nvblox/releases' + \
-        f'/download/v{NVBLOX_VERSION_NUMBER}',
-    'wheel_name_ubuntu_24_cuda_12': \
-        'nvblox_torch-0.0.9.dev1+cu12ubuntu24-py3-none-linux_x86_64.whl',
-    'wheel_name_ubuntu_22_cuda_12': \
-        'nvblox_torch-0.0.9.dev1+cu12ubuntu22-py3-none-linux_x86_64.whl',
-    'wheel_name_ubuntu_22_cuda_11': \
-        'nvblox_torch-0.0.9.dev1+cu11ubuntu22-py3-none-linux_x86_64.whl',
-    'wheel_name_ubuntu_24_cuda_13': \
-        'nvblox_torch-0.0.9.dev1+cu13ubuntu24-py3-none-linux_x86_64.whl',
     'internal_git_url': 'ssh://git@gitlab-master.nvidia.com:12051/nvblox/nvblox.git',
     'external_git_url': 'git@github.com:nvidia-isaac/nvblox.git',
     'internal_code_link_base_url': 'https://gitlab-master.nvidia.com/nvblox/nvblox/-/tree/main',
