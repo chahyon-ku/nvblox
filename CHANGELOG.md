@@ -4,8 +4,10 @@ All releases of the nvblox library will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## Unreleased (public branch)
+## [v.0.0.9] - Date: 2026-01-27
 
+- Support for LiDAR pointcloud as native input to integrateDepth.
+- Support for LiDAR motion compensation.
 - Refactor and optimization of blocks-to-update tracker.
 - Option for initializing freespace voxels to free.
 - Camera sensor extended with support for distortion (radial and tangential).

@@ -17,7 +17,7 @@ import argparse
 from pathlib import Path
 import os
 
-from nvblox_plot_timing_data.main import main
+from nvblox_plot_timing_data.__main__ import main
 
 SCRIPT_DIR = Path(__file__).parent.resolve()
 LOGFILE_PATHS = [os.path.join(SCRIPT_DIR, 'logfile1.txt'), os.path.join(SCRIPT_DIR, 'logfile2.txt')]

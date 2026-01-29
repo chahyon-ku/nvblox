@@ -68,20 +68,21 @@ function(set_nvblox_compiler_options_internal target_name enable_warnings)
   target_compile_definitions(
     ${target_name}
     PRIVATE "$<$<BOOL:${PRE_CXX11_ABI_LINKABLE}>:PRE_CXX11_ABI_LINKABLE>")
-  # Change namespace cub:: into nvblox::cub. This is to avoid conflicts when
-  # other modules calls non thread safe functions in the cub namespace.
-  # Appending nvblox:: ensures an unique symbol that is only accesed by this
-  # library.
+  # Wrap cub:: namespace into nvblox::cub to avoid conflicts when other modules
+  # use CUB compiled with different settings.
   target_compile_definitions(${target_name}
                              PRIVATE CUB_WRAPPED_NAMESPACE=nvblox)
+  # Disable Thrust's architecture-dependent ABI namespace (e.g.
+  # THRUST_200700_900_NS) to ensure consistent symbols between nvcc and gcc
+  # compiled code. Without this, gcc doesn't know which architectures nvcc
+  # compiled for, causing linker errors. THRUST_IGNORE_ABI_NAMESPACE_ERROR
+  # suppresses the safety warning.
+  target_compile_definitions(${target_name}
+                             PRIVATE THRUST_DISABLE_ABI_NAMESPACE)
+  target_compile_definitions(${target_name}
+                             PRIVATE THRUST_IGNORE_ABI_NAMESPACE_ERROR)
   # Needed to ensure that pytorch use glog
   target_compile_definitions(${target_name} PRIVATE C10_USE_GLOG=1)
-  # The directive __CUDA_ARCH_FLAGS__ is always set when building with nvcc. We
-  # need it also when building with gcc to avoid linker errors due to thrust
-  # placing certain symbols under a __CUDA_ARCH_LIST__ namepace.
-  target_compile_definitions(
-    ${target_name}
-    PRIVATE $<$<COMPILE_LANGUAGE:CXX>:__CUDA_ARCH_LIST__=${CUDA_ARCH_LIST}>)
 
   # Optionally set number of elements of nvblox's feature array. If not set, a
   # default value will be set internally.

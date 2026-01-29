@@ -31,8 +31,8 @@ Eigen::Matrix3Xf DynamicsDetection::getDynamicPointsHost() {
 }
 
 const Pointcloud& DynamicsDetection::getDynamicPointcloudDevice() {
-  dynamic_pointcloud_device_.copyFromAsync(dynamic_points_device_,
-                                           *cuda_stream_);
+  dynamic_pointcloud_device_.copyPointsFromAsync(dynamic_points_device_,
+                                                 *cuda_stream_);
   cuda_stream_->synchronize();
   return dynamic_pointcloud_device_;
 }

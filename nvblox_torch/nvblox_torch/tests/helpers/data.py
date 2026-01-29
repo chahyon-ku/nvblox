@@ -17,3 +17,9 @@ def get_sun3d_test_data_dir() -> pathlib.Path:
     script_dir = pathlib.Path(__file__).parent
     sun3d_data_dir = script_dir / '..' / 'data' / '3dmatch'
     return sun3d_data_dir
+
+
+def get_orbbec_test_data_dir() -> pathlib.Path:
+    script_dir = pathlib.Path(__file__).parent
+    orbbec_data_dir = script_dir / '..' / 'data' / 'orbbec'
+    return orbbec_data_dir

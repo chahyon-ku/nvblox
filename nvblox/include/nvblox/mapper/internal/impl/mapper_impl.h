@@ -79,6 +79,28 @@ void Mapper::integrateDepth(const MaskedDepthImageConstView& depth_frame,
 }
 
 template <typename SensorType>
+void Mapper::integrateDepth(const Pointcloud& pointcloud,
+                            const Transform& T_L_S_scanStart,
+                            const SensorType& lidar_sensor,
+                            bool use_lidar_motion_compensation,
+                            const std::optional<Transform>& T_L_S_scanEnd,
+                            const std::optional<Time>& scan_duration_ms) {
+  CHECK(lidar_sensor.sensor_modality() == SensorModality::kLidar)
+      << "Pointcloud integration is only intended for lidar sensors";
+  // Direct pointcloud integration is not supported,
+  // therefore we convert the pointcloud to a spherical depth image first.
+  // During this conversion, we run motion compensation if enabled.
+  depthImageFromPointcloudGPU(pointcloud, T_L_S_scanStart, lidar_sensor,
+                              use_lidar_motion_compensation, T_L_S_scanEnd,
+                              scan_duration_ms, &depth_frame_from_pointcloud_,
+                              *cuda_stream_);
+
+  // Integrate the depth image.
+  integrateDepth(depth_frame_from_pointcloud_, T_L_S_scanStart, lidar_sensor,
+                 T_L_S_scanEnd, scan_duration_ms);
+}
+
+template <typename SensorType>
 void Mapper::integrateColor(const ColorImage& color_frame,
                             const Transform& T_L_C, const SensorType& sensor) {
   integrateColor(MaskedColorImageConstView(color_frame, kMaskActiveEverywhere),

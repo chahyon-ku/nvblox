@@ -16,6 +16,7 @@ from nvblox_torch.constants import constants
 from nvblox_torch.mapper import Mapper
 from nvblox_torch.mesh import Mesh
 from nvblox_torch.tests.helpers.camera_utils import make_camera_intrinsics_matrix
+from nvblox_torch.sensor import Sensor
 
 DEPTH = 2.0
 HEIGHT = 480
@@ -23,25 +24,23 @@ WIDTH = 640
 CAMERA_FOV = 90
 
 
-def get_pose_and_intrinsics() -> Tuple[torch.Tensor, torch.Tensor]:
+def get_pose_and_sensor() -> Tuple[torch.Tensor, Sensor]:
     pose = torch.eye(4, device='cpu', dtype=torch.float32)
     intrinsics = make_camera_intrinsics_matrix(h_fov=CAMERA_FOV,
                                                height=HEIGHT,
                                                width=WIDTH,
                                                device='cpu')
-    return pose, intrinsics
+    sensor = Sensor.from_camera_matrix(intrinsics, WIDTH, HEIGHT)
+    return pose, sensor
 
 
 def map_plane_with_mask(mask: torch.Tensor) -> Mapper:
     """Returns a mapper object containing a mapped plane."""
-    pose, intrinsics = get_pose_and_intrinsics()
+    pose, sensor = get_pose_and_sensor()
     depth_image = DEPTH * torch.ones(HEIGHT, WIDTH, device='cuda', dtype=torch.float32)
 
     mapper = Mapper(voxel_sizes_m=[0.05])
-    mapper.add_depth_frame(depth_frame=depth_image,
-                           t_w_c=pose,
-                           intrinsics=intrinsics,
-                           mask_frame=mask)
+    mapper.add_depth_frame(depth_frame=depth_image, t_w_c=pose, sensor=sensor, mask_frame=mask)
     mapper.update_color_mesh()
     return mapper
 
@@ -98,18 +97,15 @@ def test_mapper_depth_no_mask() -> None:
 
 
 def add_red_frame_to_mapper(mapper: Mapper, mask: torch.Tensor) -> None:
-    pose, intrinsics = get_pose_and_intrinsics()
+    pose, sensor = get_pose_and_sensor()
     red_color_frame = torch.zeros(HEIGHT, WIDTH, 3, device='cuda', dtype=torch.uint8)
     red_color_frame[:, :, 0] = 255
-    mapper.add_color_frame(color_frame=red_color_frame,
-                           t_w_c=pose,
-                           intrinsics=intrinsics,
-                           mask_frame=mask)
+    mapper.add_color_frame(color_frame=red_color_frame, t_w_c=pose, sensor=sensor, mask_frame=mask)
     mapper.update_color_mesh()
 
 
 def add_one_feature_frame_to_mapper(mapper: Mapper, mask: torch.Tensor) -> None:
-    pose, intrinsics = get_pose_and_intrinsics()
+    pose, sensor = get_pose_and_sensor()
     one_feature_frame = torch.ones(HEIGHT,
                                    WIDTH,
                                    constants.feature_array_num_elements(),
@@ -117,7 +113,7 @@ def add_one_feature_frame_to_mapper(mapper: Mapper, mask: torch.Tensor) -> None:
                                    dtype=torch.float16)
     mapper.add_feature_frame(feature_frame=one_feature_frame,
                              t_w_c=pose,
-                             intrinsics=intrinsics,
+                             sensor=sensor,
                              mask_frame=mask)
     mapper.update_feature_mesh()
 

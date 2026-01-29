@@ -7,6 +7,8 @@ add_nvblox_shared_library(
   src/datasets/replica.cpp
   src/datasets/redwood.cpp
   src/datasets/cusfm_data.cpp
+  src/datasets/lidarply_loader.cpp
+  src/datasets/lidarply_writer.cpp
   src/fuser.cpp
   LINK_LIBRARIES_PUBLIC
   nvblox_lib
@@ -51,6 +53,17 @@ add_nvblox_executable(
   fuse_cusfm
   SOURCE_FILES
   src/fuse_cusfm.cpp
+  LINK_LIBRARIES_PUBLIC
+  nvblox_lib
+  nvblox_datasets
+  nvblox_stdgpu
+  nvblox_gpu_hash)
+
+# Lidar dataset fuser executable
+add_nvblox_executable(
+  fuse_lidarply
+  SOURCE_FILES
+  src/fuse_lidarply.cpp
   LINK_LIBRARIES_PUBLIC
   nvblox_lib
   nvblox_datasets

@@ -17,9 +17,13 @@ from unittest.mock import patch
 
 import nvblox_torch.examples.reconstruction.sun3d as example
 from .helpers.data import get_sun3d_test_data_dir
+from .helpers.data import get_orbbec_test_data_dir
+import pathlib
 
 
-def run_sun3d_example(additional_args: Optional[List[str]] = None) -> None:
+def run_sun3d_example(data_dir: pathlib.Path,
+                      sequence_name: str = 'seq-01',
+                      additional_args: Optional[List[str]] = None) -> None:
     sun3d_test_data_dir = get_sun3d_test_data_dir()
     assert sun3d_test_data_dir.exists()
 
@@ -29,7 +33,9 @@ def run_sun3d_example(additional_args: Optional[List[str]] = None) -> None:
     test_args = [
         'sun3d_example.py',
         '--dataset_path',
-        str(sun3d_test_data_dir),
+        str(data_dir),
+        '--sequence_name',
+        sequence_name,
         '--dont_visualize',
     ]
     if additional_args is not None:
@@ -43,8 +49,13 @@ def run_sun3d_example(additional_args: Optional[List[str]] = None) -> None:
 
 
 def test_sun3d_example() -> None:
-    run_sun3d_example()
+    run_sun3d_example(data_dir=get_sun3d_test_data_dir())
 
 
 def test_sun3d_example_with_feature_mapping() -> None:
-    run_sun3d_example(['--deep_feature_mapping'])
+    run_sun3d_example(data_dir=get_sun3d_test_data_dir(),
+                      additional_args=['--deep_feature_mapping'])
+
+
+def test_orbbec_example() -> None:
+    run_sun3d_example(data_dir=get_orbbec_test_data_dir(), sequence_name='g1_sim')

@@ -69,6 +69,7 @@ def visualize_voxels_sparse_access(tsdf_layer: TsdfLayer, mesh_o3d: o3d.geometry
 
     # Visualize the voxels (and the mesh)
     if visualize:
+        print('Close the visualize window to continue...')
         o3d.visualization.draw_geometries([mesh_o3d, voxels_mesh_o3d])
 
 
@@ -92,6 +93,7 @@ def visualize_voxels_dense_access(tsdf_layer: TsdfLayer, mesh_o3d: o3d.geometry.
     )
     voxels_mesh_o3d.translate(torch.tensor([2 * SPHERE_RADIUS_M, 0.0, 0.0]))
     if visualize:
+        print('Close the visualize window to continue...')
         o3d.visualization.draw_geometries([mesh_o3d, voxels_mesh_o3d])
 
 

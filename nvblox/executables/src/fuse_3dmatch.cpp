@@ -43,7 +43,7 @@ int main(int argc, char* argv[]) {
   // Fuser
   // NOTE(alexmillane): Hardcode the sequence ID.
   constexpr int seq_id = 1;
-  std::unique_ptr<Fuser> fuser =
+  std::unique_ptr<CameraFuser> fuser =
       datasets::threedmatch::createFuser(base_path, seq_id);
   if (!fuser) {
     LOG(FATAL) << "Creation of the Fuser failed";

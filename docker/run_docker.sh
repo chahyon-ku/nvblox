@@ -98,6 +98,7 @@ then
     exit
 fi
 
+DOCKER_BUILD_ARGS=()
 if [ -z "$IMAGE_NAME" ]; then
     IMAGE_NAME=nvblox_deps
 
@@ -107,14 +108,26 @@ if [ -z "$IMAGE_NAME" ]; then
         DOCKERFILE="Dockerfile.deps"
     elif [ "$ARCH" = "aarch64" ]; then
         DOCKERFILE="Dockerfile.jetson_deps"
+        # On Jetson/Orin we use the default base image from Dockerfile.jetson_deps.
+        # On Thor (JP7) we override the base image to the requested PyTorch image.
+        if [ -n "${JETSON_L4T}" ]; then
+            case "$JETSON_L4T" in
+                # Jetpack 6 (L4T 36.x): Use the L4T JetPack 36 base image
+                36*) DOCKER_BUILD_ARGS=(--build-arg "BASE_IMAGE=nvcr.io/nvidia/l4t-jetpack:r36.3.0") ;;
+                # Thor / Jetpack 7 (L4T 38.x): use the PyTorch JP7 image
+                38*) DOCKER_BUILD_ARGS=(--build-arg "BASE_IMAGE=nvcr.io/nvidia/pytorch:25.08-py3") ;;
+            esac
+        fi
     else
         echo "Unsupported architecture: $ARCH"
         exit 1
     fi
 # Build the container.
-docker build --network=host -t $IMAGE_NAME . -f docker/$DOCKERFILE
+docker build --network=host -t "$IMAGE_NAME" -f "docker/$DOCKERFILE" "${DOCKER_BUILD_ARGS[@]}" .
 fi
 
+# Create the ccache directory if it doesn't exist. Otherwise, docker run will create it with root ownership.
+mkdir -p $HOME/.ccache
 
 # Remove any exited containers.
 if [ "$(docker ps -a --quiet --filter status=exited --filter name=$IMAGE_NAME)" ]; then

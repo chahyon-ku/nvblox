@@ -30,12 +30,12 @@ TEST(PointcloudTest, SetAndAccess) {
 
   // Write points
   for (int i = 0; i < kNumOfPoints; i++) {
-    pointcloud(i) = Vector3f(static_cast<float>(i), 0.0f, 0.0f);
+    pointcloud.point(i) = Vector3f(static_cast<float>(i), 0.0f, 0.0f);
   }
 
   // Read points
   for (int i = 0; i < kNumOfPoints; i++) {
-    EXPECT_EQ(i, static_cast<int>(pointcloud(i).x()));
+    EXPECT_EQ(i, static_cast<int>(pointcloud.point(i).x()));
   }
 }
 
@@ -44,7 +44,7 @@ TEST(PointcloudTest, Copy) {
   constexpr int kNumOfPoints = 10;
   Pointcloud pointcloud(kNumOfPoints, MemoryType::kUnified);
   for (int i = 0; i < kNumOfPoints; i++) {
-    pointcloud(i) = Vector3f(static_cast<float>(i), 0.0f, 0.0f);
+    pointcloud.point(i) = Vector3f(static_cast<float>(i), 0.0f, 0.0f);
   }
   EXPECT_EQ(pointcloud.memory_type(), MemoryType::kUnified);
 
@@ -57,14 +57,14 @@ TEST(PointcloudTest, Copy) {
   EXPECT_EQ(pointcloud_copy_2.memory_type(), MemoryType::kUnified);
 
   // Set the original to zero
-  pointcloud.setZeroAsync(CudaStreamOwning());
+  pointcloud.points().setZeroAsync(CudaStreamOwning());
 
   // Read points
   for (int i = 0; i < kNumOfPoints; i++) {
-    EXPECT_EQ(i, static_cast<int>(pointcloud_copy_1(i).x()));
+    EXPECT_EQ(i, static_cast<int>(pointcloud_copy_1.point(i).x()));
   }
   for (int i = 0; i < kNumOfPoints; i++) {
-    EXPECT_EQ(i, static_cast<int>(pointcloud_copy_2(i).x()));
+    EXPECT_EQ(i, static_cast<int>(pointcloud_copy_2.point(i).x()));
   }
 }
 
@@ -78,7 +78,7 @@ TEST(PointcloudTest, DeviceCopy) {
 
   // Push it into host pointcloud
   for (int i = 0; i < kNumOfPoints; i++) {
-    pointcloud(i) = test_point;
+    pointcloud.point(i) = test_point;
   }
 
   // Pointcloud to the device
@@ -89,7 +89,7 @@ TEST(PointcloudTest, DeviceCopy) {
   // Check that the data made it.
   std::vector<Vector3f> points_on_host(kNumOfPoints);
   checkCudaErrors(
-      cudaMemcpy(points_on_host.data(), pointcloud_gpu.dataConstPtr(),
+      cudaMemcpy(points_on_host.data(), pointcloud_gpu.pointsConstPtr(),
                  sizeof(Vector3f) * kNumOfPoints, cudaMemcpyDeviceToHost));
 
   for (int i = 0; i < kNumOfPoints; i++) {
@@ -107,13 +107,13 @@ TEST(PointcloudTest, ConstructFromVector) {
 
   // To kUnified Pointcloud
   Pointcloud pointcloud(MemoryType::kUnified);
-  pointcloud.copyFromAsync(points_vec, CudaStreamOwning());
+  pointcloud.copyPointsFromAsync(points_vec, CudaStreamOwning());
   EXPECT_EQ(pointcloud.memory_type(), MemoryType::kUnified);
 
   // Check
   CHECK_EQ(pointcloud.size(), kNumPoints);
   for (int i = 0; i < kNumPoints; i++) {
-    EXPECT_TRUE(pointcloud(i) == Vector3f(i, 0, 0));
+    EXPECT_TRUE(pointcloud.point(i) == Vector3f(i, 0, 0));
   }
 }
 
@@ -138,7 +138,7 @@ TEST(PointcloudTest, TransformPointcloudOnGpu) {
 
   constexpr float kEpsilon = 1e-4;
   for (int i = 0; i < pointcloud_B.size(); i++) {
-    const Vector3f& p_B = pointcloud_B(i);
+    const Vector3f& p_B = pointcloud_B.point(i);
     EXPECT_NEAR(p_B.x(), 0.0f, kEpsilon);
     EXPECT_NEAR(p_B.y(), 5.0f, kEpsilon);
     EXPECT_NEAR(p_B.z(), i - 5.0f, kEpsilon);

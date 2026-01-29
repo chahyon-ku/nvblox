@@ -22,6 +22,7 @@
 #include "nvblox_torch/py_mesh.h"
 #include "nvblox_torch/py_rendering.h"
 #include "nvblox_torch/py_scene.h"
+#include "nvblox_torch/py_sensor.h"
 
 namespace pynvblox {
 
@@ -286,13 +287,21 @@ TORCH_LIBRARY(pynvblox, m) {
       .def("set_block_memory_pool_params",
            &MapperParams::set_block_memory_pool_params);
 
+  m.class_<PySensor>("Sensor")
+      .def_static("from_camera", &PySensor::fromCamera)
+      .def_static("from_camera_distorted", &PySensor::fromCameraDistorted)
+      .def_static("from_lidar", &PySensor::fromLidar)
+      .def("get_sensor_modality", &PySensor::getSensorModality)
+      .def("width", &PySensor::width)
+      .def("height", &PySensor::height);
+
   m.class_<Mapper>("Mapper")
       .def(torch::init<std::vector<double>, std::vector<std::string>,
                        c10::intrusive_ptr<MapperParams>>())
-      // Mapping methods
       .def("integrate_depth", &Mapper::integrateDepth)
       .def("integrate_color", &Mapper::integrateColor)
       .def("integrate_features", &Mapper::integrateFeatures)
+
       .def("update_esdf", &Mapper::updateEsdf)
       .def("update_color_mesh", &Mapper::updateColorMesh)
       .def("update_feature_mesh", &Mapper::updateFeatureMesh)

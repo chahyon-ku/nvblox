@@ -79,7 +79,20 @@ bool outputPointcloudToPly(const Pointcloud& pointcloud,
   // Create a ply writer object.
   io::PlyWriter writer(filename);
   std::vector<Vector3f> points = pointcloud.points().toVectorAsync(cuda_stream);
+
+  // Extract timestamps if they exist
+  std::vector<Time> timestamps_ms;
+  if (pointcloud.timestamps_ms().has_value()) {
+    timestamps_ms =
+        pointcloud.timestamps_ms().value().toVectorAsync(cuda_stream);
+  }
+
+  cuda_stream.synchronize();
   writer.setPoints(&points);
+
+  if (!timestamps_ms.empty()) {
+    writer.setTimestamps(&timestamps_ms);
+  }
 
   // Write out the ply.
   return writer.write();

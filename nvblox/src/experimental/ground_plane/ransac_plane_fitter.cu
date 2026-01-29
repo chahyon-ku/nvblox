@@ -117,7 +117,7 @@ std::optional<Plane> RansacPlaneFitter::fit(const Pointcloud& point_cloud) {
 
   // Run the kernel.
   ransacKernel<<<thread_blocks, threads_per_block, 0, *cuda_stream_>>>(
-      point_cloud.dataConstPtr(), point_cloud.size(), num_ransac_iterations_,
+      point_cloud.pointsConstPtr(), point_cloud.size(), num_ransac_iterations_,
       ransac_distance_threshold_m_, random_states_device_.data(),
       costs_device_.data(), planes_device_.data());
   checkCudaErrors(cudaPeekAtLastError());

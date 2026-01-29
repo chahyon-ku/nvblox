@@ -1,10 +1,6 @@
 ARG BASE_IMAGE=nvcr.io/nvidia/l4t-jetpack:r36.3.0
 FROM ${BASE_IMAGE}
 
-# Argument for skipping pytorch installation.
-ARG SKIP_PYTORCH_INSTALL=0
-ENV SKIP_PYTORCH_INSTALL=${SKIP_PYTORCH_INSTALL}
-
 # TZData goes first.
 RUN apt-get update
 ENV TZ=Europe/Berlin
@@ -31,9 +27,9 @@ RUN apt update && apt-get --no-install-recommends install -y \
 # Create a virtual environment for python.
 RUN python3 -m venv /opt/venv
 
-# Install pytorch and torchvision (if SKIP_PYTORCH_INSTALL==0)
-COPY docker/maybe_install_cuda_pytorch.sh /
-RUN /maybe_install_cuda_pytorch.sh
+# Install pytorch and torchvision if supported on the current platform.
+COPY docker/torch_install_helper.py /
+RUN python3 /torch_install_helper.py --install-pytorch-if-supported
 
 # Install python deps.
 RUN . /opt/venv/bin/activate && \

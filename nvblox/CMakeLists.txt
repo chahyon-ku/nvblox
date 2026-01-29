@@ -85,6 +85,7 @@ add_nvblox_shared_library(
   src/sensors/camera.cpp
   src/sensors/color.cpp
   src/sensors/pointcloud.cu
+  src/sensors/pointcloud_to_depth_conversion.cu
   src/sensors/image.cu
   src/sensors/npp_image_operations.cpp
   src/sensors/depth_preprocessing.cpp
@@ -112,6 +113,7 @@ add_nvblox_shared_library(
   src/interpolation/interpolation_3d.cpp
   src/io/mesh_io.cpp
   src/io/ply_writer.cpp
+  src/io/ply_parser.cpp
   src/io/layer_cake_io.cpp
   src/io/pointcloud_io.cpp
   src/io/image_io.cpp

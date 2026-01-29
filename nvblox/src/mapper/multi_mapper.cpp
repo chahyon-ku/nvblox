@@ -15,6 +15,11 @@ limitations under the License.
 */
 #include "nvblox/mapper/multi_mapper.h"
 
+#include <cmath>
+#include <fstream>
+#include <iomanip>
+#include <limits>
+
 #include "nvblox/geometry/bounding_spheres.h"
 #include "nvblox/io/layer_cake_io.h"
 #include "nvblox/mapper/internal/mapper_common.h"
@@ -201,6 +206,10 @@ const Pointcloud& MultiMapper::getLastDynamicPointcloud() {
   return dynamic_detector_.getDynamicPointcloudDevice();
 }
 
+const DepthImage& MultiMapper::getLastDepthFrameFromPointcloud() {
+  return depth_frame_from_pointcloud_;
+}
+
 void MultiMapper::updateEsdfOfMapper(const std::shared_ptr<Mapper> mapper,
                                      std::optional<Plane> ground_plane) {
   switch (esdf_mode_) {
@@ -233,4 +242,48 @@ std::string MultiMapper::getParametersAsString() const {
   return parameterTreeToString(getParameterTree());
 }
 
+bool MultiMapper::saveGroundPlaneAsYaml(const std::string& filepath) {
+  const TsdfLayer& tsdf_layer = background_mapper_->tsdf_layer();
+  std::optional<Plane> ground_plane =
+      ground_plane_estimator_.computeGroundPlane(tsdf_layer);
+
+  if (!ground_plane.has_value()) {
+    LOG(WARNING) << "Ground plane estimation failed - no plane detected";
+    return false;
+  }
+
+  std::ofstream out(filepath);
+  if (!out.is_open()) {
+    LOG(ERROR) << "Failed to open ground plane output file: " << filepath;
+    return false;
+  }
+
+  const Vector3f& normal = ground_plane->normal();
+  const float height = ground_plane->offset();
+
+  if (!std::isfinite(normal.x()) || !std::isfinite(normal.y()) ||
+      !std::isfinite(normal.z()) || !std::isfinite(height)) {
+    LOG(ERROR) << "Ground plane data is not finite: normal: (" << normal.x()
+               << ", " << normal.y() << ", " << normal.z()
+               << ") and height: " << height;
+    return false;
+  }
+
+  out << std::setprecision(std::numeric_limits<double>::max_digits10);
+  out << "normal: [" << normal.x() << ", " << normal.y() << ", " << normal.z()
+      << "]\n";
+  out << "height: " << height << "\n";
+
+  if (out.fail()) {
+    LOG(ERROR) << "Failed to write ground plane data to file: " << filepath;
+    return false;
+  }
+
+  out.close();
+
+  LOG(INFO) << "Ground plane saved with normal: (" << normal.x() << ", "
+            << normal.y() << ", " << normal.z() << ") and height: " << height;
+
+  return true;
+}
 }  // namespace nvblox

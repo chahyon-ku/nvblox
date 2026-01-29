@@ -18,9 +18,9 @@ from pathlib import Path
 from typing import Tuple
 
 import numpy as np
-
 import open3d as o3d
-from plyfile import PlyData, PlyElement
+import os
+
 from matplotlib import pyplot as plt
 from scipy.spatial import cKDTree as KDTree
 
@@ -250,10 +250,13 @@ class VoxelGrid:
         VoxelGrid: The object representing the VoxelGrid.
 
         """
+        assert os.path.exists(str(ply_path)), f'File does not exist: {ply_path}'
+        # Read the point cloud using Open3D tensor API
+        pcd_tensor = o3d.t.io.read_point_cloud(str(ply_path))
         # Get the xyz position of voxels
-        sdf_pointcloud_xyz = np.asarray(o3d.io.read_point_cloud(str(ply_path)).points)
-        # Get the ESDF values
-        sdf_pointcloud_values = np.array(PlyData.read(str(ply_path)).elements[0]['intensity'])
+        sdf_pointcloud_xyz = pcd_tensor.point.positions.cpu().numpy()
+        # Get the ESDF values (intensity)
+        sdf_pointcloud_values = pcd_tensor.point['intensity'].cpu().numpy().flatten()
         return VoxelGrid.create_from_sparse_voxels(sdf_pointcloud_xyz, sdf_pointcloud_values)
 
     def write_to_ply(self, ply_path: Path) -> None:
@@ -267,12 +270,12 @@ class VoxelGrid:
         """
         xyz = self.get_valid_voxel_centers()
         distances = self.get_valid_voxel_values()
-        xyzi = np.hstack([xyz, distances.reshape((-1, 1))])
-        xyzi_structured = np.array([tuple(row) for row in xyzi],
-                                   dtype=[('x', 'f4'), ('y', 'f4'), ('z', 'f4'),
-                                          ('intensity', 'f4')])
-        point_elements = PlyElement.describe(xyzi_structured, 'vertex')
-        PlyData([point_elements], text=True).write(str(ply_path))
+        # Create Open3D tensor point cloud
+        pcd = o3d.t.geometry.PointCloud(o3d.core.Tensor(xyz, dtype=o3d.core.float32))
+        # Add intensity as a custom attribute (must be column vector with shape (N, 1))
+        pcd.point['intensity'] = o3d.core.Tensor(distances.reshape(-1, 1), dtype=o3d.core.float32)
+        # Write to PLY file
+        o3d.t.io.write_point_cloud(str(ply_path), pcd, write_ascii=True)
 
     @staticmethod
     def create_from_npz(npz_path: Path) -> 'VoxelGrid':

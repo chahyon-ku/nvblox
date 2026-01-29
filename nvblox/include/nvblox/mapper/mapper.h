@@ -171,6 +171,28 @@ class Mapper : public MapperBase {
   void integrateDepth(const MaskedDepthImageConstView& depth_frame,
                       const Transform& T_L_C, const SensorType& sensor);
 
+  /// @brief Integrates a LiDAR pointcloud into the reconstruction.
+  /// The pointcloud will be converted to a depth image and then integrated.
+  /// Runs motion compensation if use_lidar_motion_compensation is true and
+  //  per-point timestamps, T_L_S_scanEnd and scan_duration_ms are provided.
+  ///
+  /// @param pointcloud Pointcloud to integrate. Must contain points and
+  ///                   optionally per-point timestamps for motion compensation.
+  /// @param T_L_S_scanStart Pose of the LiDAR sensor at scan start, specified
+  ///                        as a transform from sensor frame to layer frame.
+  /// @param lidar_sensor Intrinsics model of the LiDAR sensor.
+  /// @param use_lidar_motion_compensation Whether to use motion compensation.
+  /// @param T_L_S_scanEnd Pose of the LiDAR sensor at scan end. Only needed if
+  /// motion compensation is enabled.
+  /// @param scan_duration_ms Duration of the scan in milliseconds. Only needed
+  /// if motion compensation is enabled.
+  template <typename SensorType>
+  void integrateDepth(
+      const Pointcloud& pointcloud, const Transform& T_L_S_scanStart,
+      const SensorType& lidar_sensor, bool use_lidar_motion_compensation,
+      const std::optional<Transform>& T_L_S_scanEnd = std::nullopt,
+      const std::optional<Time>& scan_duration_ms = std::nullopt);
+
   /// Integrates a color frame into the reconstruction.
   ///@param color_frame Color image to integrate.
   ///@param T_L_C Pose of the sensor, specified as a transform from
@@ -808,6 +830,9 @@ class Mapper : public MapperBase {
   /// Last known depth view per sensor type for view-based decay exclusion.
   /// Stores sensor, depth image, and pose together per sensor type.
   TypeIndexedStore last_posed_depth_image_;
+
+  // Pre-allocated depth frame for pointcloud integration.
+  DepthImage depth_frame_from_pointcloud_{MemoryType::kDevice};
 };
 
 }  // namespace nvblox

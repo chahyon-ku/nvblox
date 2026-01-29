@@ -19,6 +19,7 @@ from nvblox_torch.sdf_query import EsdfQuery
 from nvblox_torch.mesh import ColorMesh, FeatureMesh
 from nvblox_torch.mapper_params import MapperParams
 from nvblox_torch.projective_integrator_types import ProjectiveIntegratorType
+from nvblox_torch.sensor import Sensor
 
 
 class QueryType(Enum):
@@ -93,64 +94,85 @@ class Mapper:
     def add_depth_frame(self,
                         depth_frame: torch.Tensor,
                         t_w_c: torch.Tensor,
-                        intrinsics: torch.Tensor,
+                        sensor: Sensor,
                         mask_frame: Optional[torch.Tensor] = None,
                         mapper_id: int = 0) -> None:
         """Add a depth frame to the mapper.
 
+        Unified entry point that works with both Sensor objects and intrinsics tensors.
+
         Args:
             depth_frame (H, W): Depth frame to integrate.
-            t_w_c  (4, 4; device=CPU): Transform from camera frame to world frame.
-            intrinsics (3, 3; device=CPU): Camera intrinsic matrix.
+            t_w_c  (4, 4; device=CPU): Transform from sensor frame to world frame.
+            sensor: Sensor object
             mask_frame (H, W; uint8): Mask frame.
             mapper_id: Map id.
+
+        Examples:
+            camera = Sensor.from_camera(fu=525, fv=525, cu=320, cv=240, width=640, height=480)
+            mapper.add_depth_frame(depth, pose, camera)
+
         """
         assert 0 <= mapper_id < len(self._voxel_sizes)
-        check_integrator_inputs(depth_frame, t_w_c, intrinsics, 'Depth', 2, torch.float32)
-        self._c_mapper.integrate_depth(depth_frame, t_w_c, intrinsics, mask_frame, mapper_id)
+
+        check_integrator_inputs(depth_frame, t_w_c, 'Depth', 2, torch.float32)
+        self._c_mapper.integrate_depth(depth_frame, t_w_c, sensor.get_c_sensor(), mask_frame,
+                                       mapper_id)
 
     def add_color_frame(self,
                         color_frame: torch.Tensor,
                         t_w_c: torch.Tensor,
-                        intrinsics: torch.Tensor,
+                        sensor: Sensor,
                         mask_frame: Optional[torch.Tensor] = None,
                         mapper_id: int = 0) -> None:
         """Add a color frame to the mapper.
 
+        Unified entry point that works with both Sensor objects and intrinsics tensors.
+
         Args:
             color_frame (H, W, 3; uint8): Color frame to integrate.
-            t_w_c  (4, 4; device=CPU): Transform from camera frame to world frame.
-            intrinsics (3, 3; device=CPU): Camera intrinsic matrix.
+            t_w_c  (4, 4; device=CPU): Transform from sensor frame to world frame.
+            sensor: Sensor object (Camera only)
             mask_frame (H, W; uint8): Mask frame.
             mapper_id: Map id.
+
+        Note:
+            Color integration only supports Camera sensors (not Lidar).
         """
         assert 0 <= mapper_id < len(self._voxel_sizes)
-        check_integrator_inputs(color_frame, t_w_c, intrinsics, 'Color', 3, torch.uint8, 3)
-        self._c_mapper.integrate_color(color_frame, t_w_c, intrinsics, mask_frame, mapper_id)
+
+        check_integrator_inputs(color_frame, t_w_c, 'Color', 3, torch.uint8, 3)
+        self._c_mapper.integrate_color(color_frame, t_w_c, sensor.get_c_sensor(), mask_frame,
+                                       mapper_id)
 
     def add_feature_frame(self,
                           feature_frame: torch.Tensor,
                           t_w_c: torch.Tensor,
-                          intrinsics: torch.Tensor,
+                          sensor: Sensor,
                           mask_frame: Optional[torch.Tensor] = None,
                           mapper_id: int = 0) -> None:
         """Add a feature frame to the mapper.
 
+        Unified entry point that works with both Sensor objects and intrinsics tensors.
+
         Args:
             feature_frame (H, W, F; float16): Feature frame to integrate.
-            t_w_c  (4, 4; device=CPU): Transform from camera frame to world frame.
-            intrinsics (3, 3; device=CPU): Camera intrinsic matrix.
+            t_w_c  (4, 4; device=CPU): Transform from sensor frame to world frame.
+            sensor: Sensor object (Camera only)
             mask_frame (H, W; uint8): Mask frame.
             mapper_id: Map id.
 
         Notes:
             F <= FeatureLayer.num_elements_per_voxel().
             If F < FeatureLayer.num_elements_per_voxel(), input features will be padded with zeros.
+            Feature integration only supports Camera sensors (not Lidar).
         """
         assert 0 <= mapper_id < len(self._voxel_sizes)
-        check_integrator_inputs(feature_frame, t_w_c, intrinsics, 'Feature', 3, torch.float16,
+
+        check_integrator_inputs(feature_frame, t_w_c, 'Feature', 3, torch.float16,
                                 constants.feature_array_num_elements())
-        self._c_mapper.integrate_features(feature_frame, t_w_c, intrinsics, mask_frame, mapper_id)
+        self._c_mapper.integrate_features(feature_frame, t_w_c, sensor.get_c_sensor(), mask_frame,
+                                          mapper_id)
 
     def update_esdf(self, mapper_id: int = -1) -> None:
         """Update the ESDF for a given mapper.
@@ -457,17 +479,15 @@ class Mapper:
 
 def check_integrator_inputs(image: torch.Tensor,
                             t_w_c: torch.Tensor,
-                            intrinsics: torch.Tensor,
                             image_type: str,
                             expected_dim: int,
                             expected_type: torch.dtype,
                             expected_num_channels: Optional[int] = None) -> None:
-    """Helper function to check that the integrator functions get inputs in the right format.
+    """Helper function to check sensor-based integrator function inputs.
 
     Args:
         image (torch.Tensor): The input image (depth, color, or mask)
-        t_w_c  (torch.Tensor): The i of the camera.
-        intrinsics (torch.Tensor): The camera intrinsics.
+        t_w_c  (torch.Tensor): The transform of the sensor.
         image_type (str): A string describing the image type (for debug message).
         expected_dim (int): The expected number of dimensions of the image.
         expected_type (torch.dtype): The type of image elements.
@@ -479,9 +499,6 @@ def check_integrator_inputs(image: torch.Tensor,
     assert image.dtype == expected_type, f'{image_type} image should have type {expected_type}.'
     # Note(Vik): Expensive operation, disable for now.
     # assert not torch.isnan(image).any().item(), f'{image_type} must not contain nan values.'
-    assert intrinsics.is_cpu, f'{image_type} intrinsics should be on the CPU.'
-    assert intrinsics.dtype == torch.float32, \
-        f'{image_type} intrinsics should have type torch.float32.'
     assert t_w_c.is_cpu, f'{image_type} t_w_c  should be on the CPU.'
     assert t_w_c.dtype == torch.float32, f'{image_type} pose should have type torch.float32.'
     if expected_num_channels:
