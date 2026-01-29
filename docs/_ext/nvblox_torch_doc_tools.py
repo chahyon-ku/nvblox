@@ -79,7 +79,7 @@ def nvblox_torch_pip_install_code_block(app: Sphinx, _: Any, source: List[str]) 
         pip_install_target_ubuntu_24_cuda_13 = \
             f'{wheel_name_ubuntu_24_cuda_13}'
 
-        return f"""
+        rst_string = f"""
 
 To install ``nvblox_torch`` via ``pip`` on a supported platform, run the following commands:
 
@@ -104,7 +104,9 @@ To install ``nvblox_torch`` via ``pip`` on a supported platform, run the followi
 
             sudo apt-get install python3-pip libglib2.0-0 libgl1 # Open3D dependencies
             pip3 install {pip_install_target_ubuntu_22_cuda_11}
-
+"""
+        if version != '0.0.8':
+            rst_string += f"""
     .. tab:: Ubuntu 24.04 + CUDA 13.0
 
         .. code-block:: bash
@@ -114,6 +116,7 @@ To install ``nvblox_torch`` via ``pip`` on a supported platform, run the followi
             pip3 install {pip_install_target_ubuntu_24_cuda_13}
 
 """
+        return rst_string
     source[0] = re.sub(r':nvblox_torch_pip_install_code_block:', replacer, source[0])
 
 
