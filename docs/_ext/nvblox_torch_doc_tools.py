@@ -184,15 +184,9 @@ def current_version_name(app: Sphinx, _: Any, source: List[str]) -> None:
             if version:
                 return version.group(1)
             else:
-                return 'unknown'
-
-        # Fallback to the standard Sphinx version config
-        version = getattr(app.config, 'version', None)
-        if version:
-            return version
-
-        # Last resort fallback
-        return 'unknown'
+                raise ValueError(f'Failed to extract version number from {smv_current_version}')
+        else:
+            raise ValueError('Failed to get current version name. Build with make multi-doc.')
 
     source[0] = re.sub(r':current_version_name:', replacer, source[0])
 
