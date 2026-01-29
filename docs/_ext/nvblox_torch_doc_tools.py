@@ -105,6 +105,8 @@ To install ``nvblox_torch`` via ``pip`` on a supported platform, run the followi
             sudo apt-get install python3-pip libglib2.0-0 libgl1 # Open3D dependencies
             pip3 install {pip_install_target_ubuntu_22_cuda_11}
 """
+        # Only add the CUDA 13.0 tab if the version is not 0.0.8.
+        # TODO(dtingdahl) handle this in a more elegant way to support future release configurations.
         if version != '0.0.8':
             rst_string += f"""
     .. tab:: Ubuntu 24.04 + CUDA 13.0
