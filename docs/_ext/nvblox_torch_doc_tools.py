@@ -178,7 +178,13 @@ def current_version_name(app: Sphinx, _: Any, source: List[str]) -> None:
         # When sphinx-multiversion builds, it sets the 'smv_current_version' in the environment
         smv_current_version = getattr(app.config, 'smv_current_version', None)
         if smv_current_version:
-            return smv_current_version
+
+            # Extract version number from string containing v0.0.9
+            version = re.search(r'v(\d+\.\d+\.\d+)', smv_current_version)
+            if version:
+                return version.group(1)
+            else:
+                return 'unknown'
 
         # Fallback to the standard Sphinx version config
         version = getattr(app.config, 'version', None)
