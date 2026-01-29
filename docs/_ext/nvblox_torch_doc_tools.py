@@ -15,23 +15,28 @@ from sphinx.application import Sphinx
 
 UNKNOWN_VERSION = 'unknown'
 
-VERSION_TO_WHEEL_NAME = {
-    '0.0.9': {
-        'ubuntu_24_cuda_12': 'nvblox_torch-0.0.9+cu12ubuntu24-py3-none-linux_x86_64.whl',
-        'ubuntu_22_cuda_12': 'nvblox_torch-0.0.9+cu12ubuntu22-py3-none-linux_x86_64.whl',
-        'ubuntu_22_cuda_11': 'nvblox_torch-0.0.9+cu11ubuntu22-py3-none-linux_x86_64.whl',
-        'ubuntu_24_cuda_13': 'nvblox_torch-0.0.9+cu13ubuntu24-py3-none-linux_x86_64.whl',
-    }
-}
 
-WHEEL_BASE_URL = 'https://github.com/nvidia-isaac/nvblox/releases/download/'
+WHEEL_BASE_URL = 'https://github.com/nvidia-isaac/nvblox/releases/download'
+
+
+
+def get_wheel_url_0_0_8(cuda_version: str, ubuntu_version: str) -> str:
+    """Get the wheel URL for version 0.0.8. It is a special case because it has build number in the wheen name.
+    """
+    return f'{WHEEL_BASE_URL}/v0.0.8/nvblox_torch-0.0.8rc5+cu{cuda_version}ubuntu{ubuntu_version}-863-py3-none-linux_x86_64.whl'
+
+def get_wheel_url_general(version: str, cuda_version: str, ubuntu_version: str) -> str:
+    """Get the wheel URL for a given version, CUDA version, and Ubuntu version.
+    """
+    return f'{WHEEL_BASE_URL}/v{version}/nvblox_torch-{version}+cu{cuda_version}ubuntu{ubuntu_version}-py3-none-linux_x86_64.whl'
 
 def get_wheel_url(version: str, cuda_version: str, ubuntu_version: str) -> str:
     """Get the wheel URL for a given version, CUDA version, and Ubuntu version.
-
     """
-    return f'{WHEEL_BASE_URL}v{version}/nvblox_torch-{version}+cu{cuda_version}ubuntu{ubuntu_version}-py3-none-linux_x86_64.whl'
-
+    if version == '0.0.8':
+        return get_wheel_url_0_0_8(cuda_version, ubuntu_version)
+    else:
+        return get_wheel_url_general(version, cuda_version, ubuntu_version)
 
 def get_smv_version_number(app: Sphinx) -> str:
     """Get the version number from the sphinx-multiversion current version.
@@ -63,6 +68,7 @@ def nvblox_torch_pip_install_code_block(app: Sphinx, _: Any, source: List[str]) 
         wheel_name_ubuntu_22_cuda_12 = get_wheel_url(version, '12', '22')
         wheel_name_ubuntu_22_cuda_11 = get_wheel_url(version, '11', '22')
         wheel_name_ubuntu_24_cuda_13 = get_wheel_url(version, '13', '24')
+
         
         pip_install_target_ubuntu_24_cuda_12 = \
             f'{wheel_name_ubuntu_24_cuda_12}'
@@ -108,7 +114,6 @@ To install ``nvblox_torch`` via ``pip`` on a supported platform, run the followi
             pip3 install {pip_install_target_ubuntu_24_cuda_13}
 
 """
-
     source[0] = re.sub(r':nvblox_torch_pip_install_code_block:', replacer, source[0])
 
 
