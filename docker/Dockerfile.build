@@ -22,7 +22,9 @@ RUN cd nvblox && mkdir build && cd build && \
     # To avoid out-of-memory, we limit the number of build jobs to max(num_cpu_cores, MAX_NUM_JOBS).
     NUM_JOBS=$(echo "$(nproc) $MAX_NUM_JOBS" | awk '{print ($1<$2)?$1:$2}') && \
     echo "Number of build jobs: $NUM_JOBS" && \
-    bash -ic "cmake ..  ${CMAKE_ARGS} -DCMAKE_VERBOSE_MAKEFILE=1 && make -j $NUM_JOBS"
+    bash -ic "cmake ..  ${CMAKE_ARGS} && make -j $NUM_JOBS"
 
-# Copy the complete source tree
+# Copy the complete source tree and install nvblox_torch if supported on the current platform.
+# Note that we need to copy the full repo, including the .git dir, to read the current commit-SHA.
 COPY . /nvblox
+RUN python3 /nvblox/docker/torch_install_helper.py --install-nvblox-torch-if-supported

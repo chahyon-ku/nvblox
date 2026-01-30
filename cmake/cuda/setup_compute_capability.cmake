@@ -69,18 +69,4 @@ foreach(ARCH IN LISTS CMAKE_CUDA_ARCHITECTURES)
   list(APPEND TORCH_CUDA_ARCH_LIST "${DOT_SEPARATED}")
 endforeach()
 
-# Reformat for CUDA_ARCH_LIST by appending a zero to the end of each
-# architecture
-set(CUDA_ARCH_LIST "")
-foreach(ARCH IN LISTS CMAKE_CUDA_ARCHITECTURES)
-  list(APPEND CUDA_ARCH_LIST "${ARCH}0")
-endforeach()
-
-# Architectures are required to be in ascending order
-list(SORT CUDA_ARCH_LIST COMPARE NATURAL)
-
-# Join the list into a comma-separated string
-string(JOIN "," CUDA_ARCH_LIST ${CUDA_ARCH_LIST})
-
-message(STATUS "CUDA_ARCH_LIST ${CUDA_ARCH_LIST}")
 message(STATUS "TORCH_CUDA_ARCH_LIST: ${TORCH_CUDA_ARCH_LIST}")

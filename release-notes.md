@@ -1,5 +1,26 @@
 # Release Notes
 
+## [v.0.0.9] - Date: 2026-01-27
+
+This release brings a major overhaul of sensor handling to **nvblox**.
+
+### Sensor upgrades
+
+- LiDAR is now a first-class sensor in nvblox, delivering full feature parity with depth cameras.
+- This upgrade unlocks **dynamic object detection**, enabling LiDAR-equipped robots to operate in dynamic, real-world environments.
+- To further elevate LiDAR performance, we introduce **motion compensation**, which unwraps LiDAR point clouds using the robot’s motion.
+- Camera support has been enhanced with the addition of **radial and tangential distortion parameters**, extending the range of vision platforms supported by nvblox.
+- Additionally, nvblox now supports **externally defined sensor types**, making it possible to integrate proprietary or specialized sensors into your perception stack.
+
+### Additional improvements
+
+- nvblox now builds and runs on the latest NVIDIA DGPUs, including the Blackwell generation.
+- nvblox_torch is now supported on Jetpack 6.
+- Refactored and optimized blocks-to-update tracker for improved performance.
+- Option for initializing freespace voxels to free.
+- Color and Feature integrators now use exponential filter instead of weighted average.
+
+
 
 ## [v.0.0.8] - Date: 2025-06-17
 

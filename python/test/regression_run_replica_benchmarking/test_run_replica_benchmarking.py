@@ -19,7 +19,7 @@ from pathlib import Path
 
 import numpy
 
-from nvblox_run_replica_benchmarking.main import main
+from nvblox_run_replica_benchmarking.__main__ import main
 
 # Repo path to dataset used in regression tests
 DATASET_PATH = 'nvblox/tests/data/replica/office0'

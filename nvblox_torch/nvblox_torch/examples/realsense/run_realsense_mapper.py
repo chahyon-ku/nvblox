@@ -22,6 +22,7 @@ from nvblox_torch.examples.realsense.visualizer import RerunVisualizer
 from nvblox_torch.projective_integrator_types import ProjectiveIntegratorType
 from nvblox_torch.mapper import Mapper
 from nvblox_torch.mapper_params import MapperParams, ProjectiveIntegratorParams
+from nvblox_torch.sensor import Sensor
 from nvblox_torch.timer import Timer, timer_status_string
 
 # pylint: disable=invalid-name
@@ -90,10 +91,16 @@ def main() -> int:
     T_C_left_infrared_C_color = realsense_dataloader.T_C_left_infrared_C_color()
     T_C_left_infrared_C_color = rs_extrinsics_to_homogeneous(T_C_left_infrared_C_color)
     T_C_left_infrared_C_color = torch.from_numpy(T_C_left_infrared_C_color).float()
-    depth_intrinsics = torch.from_numpy(
-        rs_intrinsics_to_matrix(realsense_dataloader.depth_intrinsics())).float()
-    color_intrinsics = torch.from_numpy(
-        rs_intrinsics_to_matrix(realsense_dataloader.color_intrinsics())).float()
+    depth_intrinsics = realsense_dataloader.depth_intrinsics()
+    color_intrinsics = realsense_dataloader.color_intrinsics()
+    depth_intrinsics_matrix = torch.from_numpy(rs_intrinsics_to_matrix(depth_intrinsics)).float()
+    color_intrinsics_matrix = torch.from_numpy(rs_intrinsics_to_matrix(color_intrinsics)).float()
+
+    # Create sensors from intrinsics
+    depth_sensor = Sensor.from_camera_matrix(depth_intrinsics_matrix, depth_intrinsics.width,
+                                             depth_intrinsics.height)
+    color_sensor = Sensor.from_camera_matrix(color_intrinsics_matrix, color_intrinsics.width,
+                                             color_intrinsics.height)
 
     # Visualize in rerun
     visualizer = RerunVisualizer()
@@ -123,7 +130,7 @@ def main() -> int:
                 T_W_C_left_infrared is not None:
                 # TODO(alexmillane, 2025.05.22): The pose used here is slighly wrong. It should be
                 # interpolated between the cuVSLAM poses based on the timestamp.
-                nvblox_mapper.add_depth_frame(frame['depth'], T_W_C_left_infrared, depth_intrinsics)
+                nvblox_mapper.add_depth_frame(frame['depth'], T_W_C_left_infrared, depth_sensor)
 
         with Timer('color'):
             if T_W_C_left_infrared is not None and \
@@ -132,7 +139,7 @@ def main() -> int:
                 T_W_C_color = T_W_C_left_infrared @ T_C_left_infrared_C_color
                 # TODO(alexmillane, 2025.05.22): The pose used here is slighly wrong. It should be
                 # interpolated between the cuVSLAM poses based on the timestamp.
-                nvblox_mapper.add_color_frame(frame['rgb'], T_W_C_color, color_intrinsics)
+                nvblox_mapper.add_color_frame(frame['rgb'], T_W_C_color, color_sensor)
 
         with Timer('visualize_rerun'):
             # Visualize pose. This occurs every time we track.

@@ -4,3 +4,4 @@ sphinx_tabs==3.4.*
 nvidia-sphinx-theme==0.0.*
 snowballstemmer==2.2.*
 setuptools==80.*
+sphinx-multiversion==0.2.4

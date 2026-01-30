@@ -108,6 +108,8 @@ class Lidar : public SensorBase {
   __host__ __device__ inline float min_valid_range_m() const;
   __host__ __device__ inline float vertical_fov_rad() const;
   __host__ __device__ inline float start_polar_angle_rad() const;
+  __host__ __device__ inline float min_angle_below_zero_elevation_rad() const;
+  __host__ __device__ inline float max_angle_above_zero_elevation_rad() const;
   __host__ __device__ inline int numel() const;
   __host__ __device__ inline int rows() const;
   __host__ __device__ inline int cols() const;
@@ -160,6 +162,8 @@ class Lidar : public SensorBase {
   float min_valid_range_squared_m_ = 1e-6F;  // squared version for optimization
   float vertical_fov_rad_ = 0.F;
   float start_polar_angle_rad_ = 0.F;
+  float min_angle_below_zero_elevation_rad_ = 0.F;
+  float max_angle_above_zero_elevation_rad_ = 0.F;
 
   // Dependent parameters
   float start_azimuth_angle_rad_ = 0.F;

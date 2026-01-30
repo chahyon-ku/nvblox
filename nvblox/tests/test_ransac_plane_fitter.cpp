@@ -32,7 +32,7 @@ TEST(PlaneFitterTestGpu, NoPointsPointCloud) {
   auto cuda_stream = std::make_shared<CudaStreamOwning>();
   std::vector<Vector3f> empty_point_cloud = {};
   Pointcloud empty_point_cloud_device;
-  empty_point_cloud_device.copyFromAsync(empty_point_cloud, *cuda_stream);
+  empty_point_cloud_device.copyPointsFromAsync(empty_point_cloud, *cuda_stream);
   cuda_stream->synchronize();
 
   RansacPlaneFitter ransac_plane_fitter(cuda_stream);
@@ -48,8 +48,8 @@ TEST(PlaneFitterTestGpu, TwoPointsPointCloud) {
       Vector3f(1.0f, 0.0f, 0.1f),
   };
   Pointcloud two_points_point_cloud_device;
-  two_points_point_cloud_device.copyFromAsync(two_points_point_cloud,
-                                              *cuda_stream);
+  two_points_point_cloud_device.copyPointsFromAsync(two_points_point_cloud,
+                                                    *cuda_stream);
   cuda_stream->synchronize();
 
   RansacPlaneFitter ransac_plane_fitter(cuda_stream);
@@ -67,7 +67,7 @@ TEST(PlaneFitterTestGpu, ColliniearPointsPointCloud) {
   };
 
   Pointcloud collinear_points_point_cloud_device;
-  collinear_points_point_cloud_device.copyFromAsync(
+  collinear_points_point_cloud_device.copyPointsFromAsync(
       collinear_points_point_cloud, *cuda_stream);
   cuda_stream->synchronize();
 
@@ -90,7 +90,7 @@ TEST(PlaneFitterTestGpu, FitToKnownPlanarPoints) {
       Vector3f(1.0f, 1.0f, 0.1f), Vector3f(2.0f, 1.0f, 0.1f),
       Vector3f(0.5f, 0.5f, 0.1f)};
   Pointcloud point_cloud_device;
-  point_cloud_device.copyFromAsync(point_cloud, *cuda_stream);
+  point_cloud_device.copyPointsFromAsync(point_cloud, *cuda_stream);
   cuda_stream->synchronize();
 
   RansacPlaneFitter ransac_plane_fitter(cuda_stream);
@@ -134,7 +134,7 @@ TEST(ParameterizedPlaneFitterTestGpu, FitToPlanarPointsWithCorruption) {
 
   auto cuda_stream = std::make_shared<CudaStreamOwning>();
   Pointcloud point_cloud_device;
-  point_cloud_device.copyFromAsync(point_cloud, *cuda_stream);
+  point_cloud_device.copyPointsFromAsync(point_cloud, *cuda_stream);
   cuda_stream->synchronize();
 
   // Verify Ransac

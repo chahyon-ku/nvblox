@@ -40,6 +40,14 @@ DEFINE_double(esdf_slice_max_height, kEsdfSliceMaxHeightParamDesc.default_value,
 DEFINE_double(esdf_slice_height, kEsdfSliceHeightParamDesc.default_value,
               kEsdfSliceHeightParamDesc.help_string);
 
+DEFINE_double(slice_height_above_plane_m,
+              kSliceHeightAbovePlaneMParamDesc.default_value,
+              kSliceHeightAbovePlaneMParamDesc.help_string);
+
+DEFINE_double(slice_height_thickness_m,
+              kSliceHeightThicknessMParamDesc.default_value,
+              kSliceHeightThicknessMParamDesc.help_string);
+
 // ======= MULTI-MAPPER =======
 DEFINE_int32(connected_mask_component_size_threshold,
              kConnectedMaskComponentSizeThresholdParamDesc.default_value,
@@ -66,6 +74,10 @@ DEFINE_int32(num_ransac_iterations, kNumRansacIterationsDesc.default_value,
 
 DEFINE_int32(ransac_type, static_cast<int>(kRansacTypeDesc.default_value),
              kRansacTypeDesc.help_string);
+
+DEFINE_bool(experimental_use_ground_plane_estimation,
+            kExperimentalUseGroundPlaneEstimationDesc.default_value,
+            kExperimentalUseGroundPlaneEstimationDesc.help_string);
 
 // ======= PROJECTIVE INTEGRATOR (TSDF/COLOR/OCCUPANCY) =======
 DEFINE_double(
@@ -290,6 +302,16 @@ inline MultiMapperParams get_multi_mapper_params_from_gflags() {
         static_cast<RansacType>(FLAGS_ransac_type);
   }
 
+  if (!gflags::GetCommandLineFlagInfoOrDie(
+           "experimental_use_ground_plane_estimation")
+           .is_default) {
+    LOG(INFO) << "Command line parameter found: "
+                 "experimental_use_ground_plane_estimation = "
+              << FLAGS_experimental_use_ground_plane_estimation;
+    params.experimental_use_ground_plane_estimation =
+        FLAGS_experimental_use_ground_plane_estimation;
+  }
+
   return params;
 }
 
@@ -332,6 +354,20 @@ inline MapperParams get_mapper_params_from_gflags() {
               << FLAGS_esdf_slice_height;
     params.esdf_integrator_params.esdf_slice_height =
         static_cast<float>(FLAGS_esdf_slice_height);
+  }
+  if (!gflags::GetCommandLineFlagInfoOrDie("slice_height_above_plane_m")
+           .is_default) {
+    LOG(INFO) << "Command line parameter found: slice_height_above_plane_m = "
+              << FLAGS_slice_height_above_plane_m;
+    params.esdf_integrator_params.slice_height_above_plane_m =
+        static_cast<float>(FLAGS_slice_height_above_plane_m);
+  }
+  if (!gflags::GetCommandLineFlagInfoOrDie("slice_height_thickness_m")
+           .is_default) {
+    LOG(INFO) << "Command line parameter found: slice_height_thickness_m = "
+              << FLAGS_slice_height_thickness_m;
+    params.esdf_integrator_params.slice_height_thickness_m =
+        static_cast<float>(FLAGS_slice_height_thickness_m);
   }
 
   // ======= PROJECTIVE INTEGRATOR (TSDF/COLOR/OCCUPANCY) =======

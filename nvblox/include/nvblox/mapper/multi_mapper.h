@@ -86,6 +86,8 @@ inline std::string toString(const MappingType& mapping_type) {
       break;
     default:
       CHECK(false) << "Requested mapping type is not implemented.";
+
+      return "";  // should never be reached
   }
 }
 
@@ -138,16 +140,42 @@ class MultiMapper {
                            foreground_mapper_params = std::nullopt);
 
   /// @brief Integrates a depth frame into the reconstruction (for mapping type
-  /// kStaticTsdf/kStataicOccupancy/kDynamic).
+  /// kStaticTsdf/kStaticOccupancy/kDynamic).
   /// @param depth_frame Depth frame to integrate.
   /// @param T_L_CD Pose of the depth sensor, specified as a transform from
   ///              sensor frame to layer frame transform.
   /// @param depth_sensor Intrinsics model of the depth sensor.
-  /// @param update_time_ms Current update time in millisecond.
+  /// @param update_time_ms Current update time in millisecond. Only needed for
+  /// dynamic mapping.
   template <typename SensorType>
   void integrateDepth(const DepthImage& depth_frame, const Transform& T_L_CD,
                       const SensorType& depth_sensor,
                       const std::optional<Time>& update_time_ms = std::nullopt);
+
+  /// @brief Integrates a LiDAR pointcloud into the reconstruction.
+  /// The pointcloud will be converted to a depth image and then integrated.
+  /// Runs motion compensation if use_lidar_motion_compensation is true and
+  //  per-point timestamps, T_L_S_scanEnd and scan_duration_ms are provided.
+  ///
+  /// @param pointcloud Pointcloud to integrate. Must contain points and
+  ///                   optionally per-point timestamps for motion compensation.
+  /// @param T_L_S_scanStart Pose of the LiDAR sensor at scan start, specified
+  ///                        as a transform from sensor frame to layer frame.
+  /// @param lidar_sensor Intrinsics model of the LiDAR sensor.
+  /// @param use_lidar_motion_compensation Whether to use motion compensation.
+  /// @param T_L_S_scanEnd Pose of the LiDAR sensor at scan end. Only needed if
+  /// motion compensation is enabled.
+  /// @param scan_duration_ms Duration of the scan in milliseconds. Only needed
+  /// if motion compensation is enabled.
+  /// @param update_time_ms Current update time in millisecond. Only needed for
+  /// dynamic mapping.
+  template <typename SensorType>
+  void integrateDepth(
+      const Pointcloud& pointcloud, const Transform& T_L_S_scanStart,
+      const SensorType& lidar_sensor, bool use_lidar_motion_compensation,
+      const std::optional<Transform>& T_L_S_scanEnd = std::nullopt,
+      const std::optional<Time>& scan_duration_ms = std::nullopt,
+      const std::optional<Time>& update_time_ms = std::nullopt);
 
   /// @brief Integrates a depth camera with detection boxes into the
   /// reconstruction (for mapping type kStaticTsdf/kStaticOccupancy/kDynamic).
@@ -157,7 +185,6 @@ class MultiMapper {
   /// @param T_L_CD Pose of the depth camera, specified as a transform from
   ///              camera frame to layer frame transform.
   /// @param camera Intrinsics model of the depth camera.
-  /// @param update_time_ms Current update time in millisecond.
   void integrateDepth(const DepthImage& depth_frame,
                       const std::vector<ImageBoundingBox>& detection_boxes,
                       const Transform& T_L_CD, const Camera& depth_camera);
@@ -268,6 +295,9 @@ class MultiMapper {
   const ColorImage& getLastColorFrameMaskOverlay();
   const ColorImage& getLastDynamicFrameMaskOverlay();
   const Pointcloud& getLastDynamicPointcloud();
+  const DepthImage& getLastDepthFrameFromPointcloud();
+
+  const MultiMapperParams& getMultiMapperParams() const { return params_; }
 
   /// Return the parameter tree.
   /// @return the parameter tree
@@ -277,6 +307,11 @@ class MultiMapper {
   /// Return the parameter tree represented as a string
   /// @return the parameter tree string
   virtual std::string getParametersAsString() const;
+
+  /// Save the ground plane as a YAML file.
+  /// @param filepath Path to the output YAML file.
+  /// @return if write to file was successful
+  bool saveGroundPlaneAsYaml(const std::string& filepath);
 
  protected:
   // Performs the esdf update on the passed mapper
@@ -316,6 +351,9 @@ class MultiMapper {
 
   // Helper class estimating the ground plane
   GroundPlaneEstimator ground_plane_estimator_;
+
+  // Pre-allocated depth frame for pointcloud integration.
+  DepthImage depth_frame_from_pointcloud_{MemoryType::kDevice};
 
   // The CUDA stream on which to process all work
   std::shared_ptr<CudaStream> cuda_stream_;

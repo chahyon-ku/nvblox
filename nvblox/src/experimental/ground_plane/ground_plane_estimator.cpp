@@ -41,7 +41,7 @@ std::optional<Plane> GroundPlaneEstimator::computeGroundPlane(
       ground_points_candidates_max_z_m_);
 
   // Copy to a device pointcloud
-  tsdf_zero_crossings_ground_candidates_point_cloud_.copyFromAsync(
+  tsdf_zero_crossings_ground_candidates_point_cloud_.copyPointsFromAsync(
       tsdf_zero_crossings_ground_candidates_.value(), *cuda_stream_);
   cuda_stream_->synchronize();
 

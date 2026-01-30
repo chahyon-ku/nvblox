@@ -63,7 +63,7 @@ TEST(FuserTest, CommandLineFlags) {
   char** argv_ptr = argv;
   gflags::ParseCommandLineFlags(&argc, &argv_ptr, true);
 
-  std::unique_ptr<Fuser> fuser =
+  std::unique_ptr<CameraFuser> fuser =
       datasets::threedmatch::createFuser("./data/3dmatch", 1);
 
   // Check that the params made it in

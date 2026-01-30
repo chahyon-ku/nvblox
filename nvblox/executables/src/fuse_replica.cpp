@@ -46,7 +46,8 @@ int main(int argc, char* argv[]) {
   LOG(INFO) << "Loading Replica files from " << base_path;
 
   // Fuser
-  std::unique_ptr<Fuser> fuser = datasets::replica::createFuser(base_path);
+  std::unique_ptr<CameraFuser> fuser =
+      datasets::replica::createFuser(base_path);
   if (!fuser) {
     LOG(FATAL) << "Creation of the Fuser failed";
   }

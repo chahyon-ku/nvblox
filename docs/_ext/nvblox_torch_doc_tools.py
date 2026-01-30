@@ -13,6 +13,52 @@ from typing import List, Any
 
 from sphinx.application import Sphinx
 
+UNKNOWN_VERSION = 'unknown'
+
+WHEEL_BASE_URL = 'https://github.com/nvidia-isaac/nvblox/releases/download'
+
+
+def get_wheel_url_0_0_8(cuda_version: str, ubuntu_version: str) -> str:
+    """Get the wheel URL for version 0.0.8.
+
+    It is a special case because it has build number in the wheel filename.
+    """
+    # pylint: disable=line-too-long
+    return f'{WHEEL_BASE_URL}/v0.0.8/nvblox_torch-0.0.8rc5+cu{cuda_version}ubuntu{ubuntu_version}-863-py3-none-linux_x86_64.whl'
+
+
+def get_wheel_url_general(version: str, cuda_version: str, ubuntu_version: str) -> str:
+    """Get the wheel URL for a given version, CUDA version, and Ubuntu version.
+    """
+    # pylint: disable=line-too-long
+    return f'{WHEEL_BASE_URL}/v{version}/nvblox_torch-{version}+cu{cuda_version}ubuntu{ubuntu_version}-py3-none-linux_x86_64.whl'
+
+
+def get_wheel_url(version: str, cuda_version: str, ubuntu_version: str) -> str:
+    """Get the wheel URL for a given version, CUDA version, and Ubuntu version.
+    """
+    if version == '0.0.8':
+        return get_wheel_url_0_0_8(cuda_version, ubuntu_version)
+    else:
+        return get_wheel_url_general(version, cuda_version, ubuntu_version)
+
+
+def get_smv_version_number(app: Sphinx) -> str:
+    """Get the version number from the sphinx-multiversion current version.
+
+    """
+    smv_current_version = getattr(app.config, 'smv_current_version', None)
+    if smv_current_version is None:
+        return UNKNOWN_VERSION
+
+    # Extract 0.0.9 from branch name like v0.0.9-docs_test
+    match = re.search(r'v(\d+\.\d+\.\d+)', smv_current_version)
+    if not match:
+        return UNKNOWN_VERSION
+    version = match.group(1)
+
+    return version
+
 
 def nvblox_torch_pip_install_code_block(app: Sphinx, _: Any, source: List[str]) -> None:
     """Replaces the :nvblox_torch_pip_install_code_block: directive with a code block.
@@ -23,30 +69,25 @@ def nvblox_torch_pip_install_code_block(app: Sphinx, _: Any, source: List[str]) 
     """
 
     def replacer(_: Any) -> str:
-        release_state = app.config.nvblox_torch_docs_config['released']
-        internal_wheel_base_url = app.config.nvblox_torch_docs_config['internal_wheel_base_url']
-        external_wheel_base_url = app.config.nvblox_torch_docs_config['external_wheel_base_url']
-        wheel_name_ubuntu_24_cuda_12 = app.config.nvblox_torch_docs_config[
-            'wheel_name_ubuntu_24_cuda_12']
-        wheel_name_ubuntu_22_cuda_12 = app.config.nvblox_torch_docs_config[
-            'wheel_name_ubuntu_22_cuda_12']
-        wheel_name_ubuntu_22_cuda_11 = app.config.nvblox_torch_docs_config[
-            'wheel_name_ubuntu_22_cuda_11']
-        if release_state:
-            pip_install_target_ubuntu_24_cuda_12 = \
-                f'{external_wheel_base_url}/{wheel_name_ubuntu_24_cuda_12}'
-            pip_install_target_ubuntu_22_cuda_12 = \
-                f'{external_wheel_base_url}/{wheel_name_ubuntu_22_cuda_12}'
-            pip_install_target_ubuntu_22_cuda_11 = \
-                f'{external_wheel_base_url}/{wheel_name_ubuntu_22_cuda_11}'
-        else:
-            pip_install_target_ubuntu_24_cuda_12 = \
-                f'{internal_wheel_base_url}/{wheel_name_ubuntu_24_cuda_12}'
-            pip_install_target_ubuntu_22_cuda_12 = \
-                f'{internal_wheel_base_url}/{wheel_name_ubuntu_22_cuda_12}'
-            pip_install_target_ubuntu_22_cuda_11 = \
-                f'{internal_wheel_base_url}/{wheel_name_ubuntu_22_cuda_11}'
-        return f"""
+
+        version = get_smv_version_number(app)
+
+        wheel_name_ubuntu_24_cuda_12 = get_wheel_url(version, '12', '24')
+        wheel_name_ubuntu_22_cuda_12 = get_wheel_url(version, '12', '22')
+        wheel_name_ubuntu_22_cuda_11 = get_wheel_url(version, '11', '22')
+        wheel_name_ubuntu_24_cuda_13 = get_wheel_url(version, '13', '24')
+
+
+        pip_install_target_ubuntu_24_cuda_12 = \
+            f'{wheel_name_ubuntu_24_cuda_12}'
+        pip_install_target_ubuntu_22_cuda_12 = \
+            f'{wheel_name_ubuntu_22_cuda_12}'
+        pip_install_target_ubuntu_22_cuda_11 = \
+            f'{wheel_name_ubuntu_22_cuda_11}'
+        pip_install_target_ubuntu_24_cuda_13 = \
+            f'{wheel_name_ubuntu_24_cuda_13}'
+
+        rst_string = f"""
 
 To install ``nvblox_torch`` via ``pip`` on a supported platform, run the following commands:
 
@@ -70,9 +111,23 @@ To install ``nvblox_torch`` via ``pip`` on a supported platform, run the followi
         .. code-block:: bash
 
             sudo apt-get install python3-pip libglib2.0-0 libgl1 # Open3D dependencies
+            pip3 install torch==2.7.1+cu118 torchvision --index-url https://download.pytorch.org/whl/cu118/
             pip3 install {pip_install_target_ubuntu_22_cuda_11}
+"""
+        # Only add the CUDA 13.0 tab if the version is not 0.0.8.
+        # TODO(dtingdahl) handle this in a more elegant way to support future releases.
+        if version != '0.0.8':
+            rst_string += f"""
+    .. tab:: Ubuntu 24.04 + CUDA 13.0
+
+        .. code-block:: bash
+
+            sudo apt-get install python3-pip libglib2.0-0 libgl1 # Open3D dependencies
+            pip3 install torch==2.9.1+cu130 torchvision --index-url https://download.pytorch.org/whl/cu130/
+            pip3 install {pip_install_target_ubuntu_24_cuda_13}
 
 """
+        return rst_string
 
     source[0] = re.sub(r':nvblox_torch_pip_install_code_block:', replacer, source[0])
 
@@ -148,9 +203,36 @@ def nvblox_code_link(app: Sphinx, _: Any, source: List[str]) -> None:
     source[0] = re.sub(r':nvblox_code_link:`<(?P<relative_path>.*)>`', replacer, source[0])
 
 
+def current_version_name(app: Sphinx, _: Any, source: List[str]) -> None:
+    """Replaces the :current_version_name: directive with the current version name.
+
+    This uses the sphinx-multiversion context if available, otherwise falls back
+    to the Sphinx version config value.
+
+    Usage in RST:
+        Current Version: :current_version_name:
+
+    """
+
+    def replacer(_: Any) -> str:
+        # Try to get the version from sphinx-multiversion's environment
+        # When sphinx-multiversion builds, it sets the 'smv_current_version' in the environment
+        smv_current_version = getattr(app.config, 'smv_current_version', None)
+        if smv_current_version:
+
+            # Extract version number from string containing v0.0.9
+            version = get_smv_version_number(app)
+            return version
+        else:
+            raise ValueError('Failed to get current version name. Build with make multi-doc.')
+
+    source[0] = re.sub(r':current_version_name:', replacer, source[0])
+
+
 def setup(app: Sphinx) -> None:
     app.connect('source-read', nvblox_torch_pip_install_code_block)
     app.connect('source-read', nvblox_torch_git_clone_code_block)
     app.connect('source-read', nvblox_code_link)
     app.connect('source-read', download_test_dataset)
+    app.connect('source-read', current_version_name)
     app.add_config_value('nvblox_torch_docs_config', {}, 'env')

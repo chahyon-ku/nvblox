@@ -18,12 +18,8 @@ from typing import List
 import os
 import sys
 
-# Modify PYTHONPATH so we can obtain the version data from setup module.
-# pylint: disable=wrong-import-position
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'nvblox_torch')))
-from setup import NVBLOX_VERSION_NUMBER
-
 # Modify PYTHONPATH so we can import the helpers module.
+# pylint: disable=wrong-import-position
 sys.path.insert(0, os.path.abspath('.'))
 from helpers import TemporaryLinkcheckIgnore, to_datetime, is_expired
 
@@ -54,6 +50,7 @@ extensions = [
     'sphinx.ext.githubpages',
     'sphinx_tabs.tabs',
     'sphinx_copybutton',
+    'sphinx_multiversion',
     # TODO(alexmillane, 2025-04-24): Try re-enabling this once we have pydocs generating.
     #    'autodocsumm'
     'nvblox_torch_doc_tools'
@@ -88,7 +85,7 @@ nitpick_ignore: List[str] = []    # can exclude known bad refs
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 html_theme = 'nvidia_sphinx_theme'
-html_title = f'nvblox_torch {NVBLOX_VERSION_NUMBER}'
+html_title = 'nvblox'
 html_show_sphinx = False
 html_theme_options = {
     'copyright_override': {
@@ -114,6 +111,12 @@ html_theme_options = {
 # html_static_path = []
 html_static_path = ['_static']
 html_css_files = ['custom.css']
+
+# Versioning (sphinx-multiversion)
+smv_remote_whitelist = r'^.*$'
+smv_branch_whitelist = r'^(public|v0.0.8|v0.0.9)$'
+smv_tag_whitelist = r'^(v0.0.8|v0.0.9)$'
+html_sidebars = {'**': ['versioning.html', 'sidebar-nav-bs']}
 
 # Todos
 todo_include_todos = True
@@ -151,16 +154,6 @@ for ignore in temporary_linkcheck_ignore:
 
 nvblox_torch_docs_config = {
     'released': released,
-    'internal_wheel_base_url': 'https://urm.nvidia.com/artifactory/hw-nvblox-alpine-local/' + \
-        'pypi/release/nvblox_torch/',
-    'external_wheel_base_url': 'https://github.com/nvidia-isaac/nvblox/releases' + \
-        f'/download/v{NVBLOX_VERSION_NUMBER}',
-    'wheel_name_ubuntu_24_cuda_12': \
-        'nvblox_torch-0.0.8rc5+cu12ubuntu24-863-py3-none-linux_x86_64.whl',
-    'wheel_name_ubuntu_22_cuda_12': \
-        'nvblox_torch-0.0.8rc5+cu12ubuntu22-863-py3-none-linux_x86_64.whl',
-    'wheel_name_ubuntu_22_cuda_11': \
-        'nvblox_torch-0.0.8rc5+cu11ubuntu22-863-py3-none-linux_x86_64.whl',
     'internal_git_url': 'ssh://git@gitlab-master.nvidia.com:12051/nvblox/nvblox.git',
     'external_git_url': 'git@github.com:nvidia-isaac/nvblox.git',
     'internal_code_link_base_url': 'https://gitlab-master.nvidia.com/nvblox/nvblox/-/tree/main',

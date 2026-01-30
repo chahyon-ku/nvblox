@@ -23,7 +23,7 @@ limitations under the License.
 #include <vector>
 
 #include "nvblox/core/types.h"
-#include "nvblox/datasets/data_loader.h"
+#include "nvblox/datasets/data_loader_interface.h"
 #include "nvblox/datasets/image_loader.h"
 #include "nvblox/executables/fuser.h"
 
@@ -35,12 +35,12 @@ namespace datasets {
 namespace cusfm_data {
 
 // Build a Fuser for the mapping data
-std::unique_ptr<Fuser> createFuser(const std::string& color_image_dir,
-                                   const std::string& depth_image_dir,
-                                   const std::string& frames_meta_file,
-                                   bool init_from_gflags,
-                                   bool fit_to_z_plane = false,
-                                   const std::string& output_dir = "");
+std::unique_ptr<CameraFuser> createFuser(const std::string& color_image_dir,
+                                         const std::string& depth_image_dir,
+                                         const std::string& frames_meta_file,
+                                         bool init_from_gflags,
+                                         bool fit_to_z_plane = false,
+                                         const std::string& output_dir = "");
 
 struct KeyframeMetadata {
   uint64_t timestamp_microseconds = 0;
@@ -83,6 +83,9 @@ class DataLoader : public RgbdDataLoaderInterface {
       const std::string& keyframe_metadata_file, bool multithreaded = true,
       bool fit_to_z_plane = false, const std::string& output_dir = "");
 
+  /// CUSFM datasets do not provide frame timestamps
+  bool provides_frame_timestamps() const override { return false; }
+
   /// Interface for a function that loads the next frames in a dataset
   /// @param[out] depth_frame_ptr The loaded depth frame.
   /// @param[out] T_L_C_ptr Transform from Camera to the Layer frame.
@@ -92,7 +95,7 @@ class DataLoader : public RgbdDataLoaderInterface {
   DataLoadResult loadNext(DepthImage* depth_frame_ptr,  // NOLINT
                           Transform* T_L_C_ptr,         // NOLINT
                           Camera* camera_ptr,           // NOLINT
-                          ColorImage* color_frame_ptr = nullptr) override;
+                          ColorImage* color_frame_ptr = nullptr);
 
   /// Interface for a function that loads the next frames in a dataset.
   /// This is the version of the function for different depth and color cameras.
@@ -102,13 +105,19 @@ class DataLoader : public RgbdDataLoaderInterface {
   /// @param[out] color_frame_ptr The loaded color frame.
   /// @param[out] T_L_C_ptr Transform from color camera to the Layer frame.
   /// @param[out] color_camera_ptr The intrinsic color camera model.
+  /// @param[out] unused Needed to match data loader interface (pass nullptr).
+  /// @param[out] unused Needed to match data loader interface (pass nullptr).
+  /// @param[out] unused Needed to match data loader interface (pass nullptr).
   /// @return Whether loading succeeded.
   DataLoadResult loadNext(DepthImage* depth_frame_ptr,  // NOLINT
                           Transform* T_L_D_ptr,         // NOLINT
                           Camera* depth_camera_ptr,     // NOLINT
                           ColorImage* color_frame_ptr,  // NOLINT
                           Transform* T_L_C_ptr,         // NOLINT
-                          Camera* color_camera_ptr) override;
+                          Camera* color_camera_ptr,     // NOLINT
+                          Time*,                        // NOLINT
+                          Transform*,                   // NOLINT
+                          Time*) override;              // NOLINT
 
  protected:
   // Mapping data directory

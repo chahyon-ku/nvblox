@@ -23,7 +23,7 @@ limitations under the License.
 namespace nvblox {
 namespace conversions {
 
-constexpr uint8_t kOccupancyGridPngUnknownValue = 205;
+constexpr uint8_t kOccupancyGridPngUnknownValue = 185;
 constexpr uint8_t kOccupancyGridPngFreeValue = 254;
 constexpr uint8_t kOccupancyGridPngOccupiedValue = 0;
 

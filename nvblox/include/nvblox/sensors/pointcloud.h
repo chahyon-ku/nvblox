@@ -1,5 +1,5 @@
 /*
-Copyright 2022 NVIDIA CORPORATION
+Copyright 2025 NVIDIA CORPORATION
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -15,79 +15,104 @@ limitations under the License.
 */
 #pragma once
 
+#include <optional>
+
 #include "nvblox/core/cuda_stream.h"
+#include "nvblox/core/time.h"
 #include "nvblox/core/types.h"
 #include "nvblox/core/unified_vector.h"
 #include "nvblox/sensors/camera.h"
 #include "nvblox/sensors/image.h"
+#include "nvblox/sensors/lidar.h"
 
 namespace nvblox {
 
 constexpr MemoryType kDefaultPointcloudMemoryType = MemoryType::kDevice;
 
 /// Pointcloud that lives in either device, host or unified memory.
-/// We represent a pointcloud as a vector of 3D vectors.
+/// We represent a pointcloud as a vector of 3D vectors and optionally a vector
+/// of per-point timestamps (relative to the scan start).
+///
+/// NOTE: If timestamps exist, they must have the same size as points (per-point
+/// timestamps). This is enforced by:
+/// - resize/reserve operations that synchronize both vectors
+/// - the timestamp accessors which validate on access (with
+/// checkTimestampsConsistency)
 class Pointcloud {
  public:
+  /// Construct a pointcloud with a given number of points (and optionally
+  /// per-point timestamps)
+  Pointcloud(int size, MemoryType memory_type = kDefaultPointcloudMemoryType,
+             bool init_timestamps = false);
   /// Construct an empty pointcloud
-  Pointcloud(int num_points,
-             MemoryType memory_type = kDefaultPointcloudMemoryType);
-  Pointcloud(MemoryType memory_type = kDefaultPointcloudMemoryType);
+  Pointcloud(MemoryType memory_type = kDefaultPointcloudMemoryType,
+             bool init_timestamps = false);
 
   /// Move operations
   Pointcloud(Pointcloud&& other) = default;
   Pointcloud& operator=(Pointcloud&& other) = default;
   Pointcloud(const Pointcloud& other) = delete;
-  void copyFromAsync(const Pointcloud& other, const CudaStream& cuda_stream);
-  void copyFromAsync(const std::vector<Vector3f>& points,
-                     const CudaStream& cuda_stream);
-  void copyFromAsync(const unified_vector<Vector3f>& points,
-                     const CudaStream& cuda_stream);
 
-  /// Deep copy constructor (second can be used to transition memory type)
-  /// Pointcloud(const Pointcloud& other);
+  /// Copy from another pointcloud
+  void copyFromAsync(const Pointcloud& other, const CudaStream& cuda_stream);
+
+  /// Copy points from a vector
+  void copyPointsFromAsync(const std::vector<Vector3f>& points,
+                           const CudaStream& cuda_stream);
+  void copyPointsFromAsync(const unified_vector<Vector3f>& points,
+                           const CudaStream& cuda_stream);
+
+  /// Copy timestamps from a vector
+  void copyTimestampsFromAsync(const unified_vector<Time>& timestamps_ms,
+                               const CudaStream& cuda_stream);
+  void copyTimestampsFromAsync(const std::vector<Time>& timestamps_ms,
+                               const CudaStream& cuda_stream);
+
+  /// Deep copy constructor
   Pointcloud(const Pointcloud& other, MemoryType memory_type);
   Pointcloud& operator=(const Pointcloud& other);
 
   /// Expand memory available
-  void resizeAsync(int num_points, const CudaStream& cuda_stream) {
-    points_.resizeAsync(num_points, cuda_stream);
-  }
-  void resize(int num_points) {
-    points_.resizeAsync(num_points, CudaStreamOwning());
-  }
+  void resizeAsync(int size, const CudaStream& cuda_stream);
+  void resize(int size);
+  void reserveAsync(int size, const CudaStream& cuda_stream);
+  void reserve(int size);
 
   /// Attributes
-  inline int num_points() const { return points_.size(); }
-  inline int size() const { return points_.size(); }
-  inline MemoryType memory_type() const { return points_.memory_type(); }
-  inline bool empty() const { return points_.empty(); }
+  int size() const { return points_.size(); }
+  MemoryType memory_type() const { return points_.memory_type(); }
+  bool empty() const { return points_.empty(); }
 
-  /// Access
-  /// NOTE(alexmillane): The guard-rails are off here. If you declare a kDevice
-  /// Image and try to access its data, you will get undefined behaviour. If you
-  /// access out of bounds, you're gonna have a bad time.
-  inline const Vector3f& operator()(const int idx) const {
-    return points_[idx];
-  }
-  inline Vector3f& operator()(const int idx) { return points_[idx]; }
+  /// Points access
+  const Vector3f& point(int index) const { return points_[index]; }
+  Vector3f& point(int index) { return points_[index]; }
   const unified_vector<Vector3f>& points() const { return points_; }
   unified_vector<Vector3f>& points() { return points_; }
 
-  /// Add points
+  /// Timestamps access
+  const std::optional<unified_vector<Time>>& timestamps_ms() const;
+  std::optional<unified_vector<Time>>& timestamps_ms();
+
+  /// Points raw pointer access
+  Vector3f* pointsPtr() { return points_.data(); }
+  const Vector3f* pointsConstPtr() const { return points_.data(); }
+
+  /// Timestamps raw pointer access
+  Time* timestampsPtr();
+  const Time* timestampsConstPtr() const;
+
+  /// Add a point
   void push_back(Vector3f&& point) { points_.push_back(point); }
 
-  /// Raw pointer access
-  inline Vector3f* dataPtr() { return points_.data(); }
-  inline const Vector3f* dataConstPtr() const { return points_.data(); }
-
-  /// Set the image to 0.
-  void setZeroAsync(const CudaStream& cuda_stream) {
-    points_.setZeroAsync(cuda_stream);
-  }
-
  protected:
+  /// Helper function to check that timestamps are consistent with points
+  void checkTimestampsConsistency() const;
+
+  /// Points in the pointcloud
   unified_vector<Vector3f> points_;
+  /// Per-point timestamps in the pointcloud (optional)
+  /// Expected to be relative to the scan start.
+  std::optional<unified_vector<Time>> timestamps_ms_;
 };
 
 /// Transforms the points in a pointcloud into another frame

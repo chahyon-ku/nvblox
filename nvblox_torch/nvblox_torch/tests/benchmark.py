@@ -12,12 +12,12 @@
 
 from nvblox_torch.datasets.sun3d_dataset import Sun3dDataset
 from nvblox_torch.mapper import Mapper
+from nvblox_torch.sensor import Sensor
 from nvblox_torch.constants import constants
 from nvblox_torch.tests.helpers.data import get_sun3d_test_data_dir
 from nvblox_torch.timer import Timer, timer_status_string
 
 import sys
-from torch.utils.data.dataloader import DataLoader
 import torch
 from typing import Dict
 
@@ -30,7 +30,7 @@ def process_frame(mapper: Mapper, data: Dict[str, torch.Tensor]) -> None:
     depth: torch.Tensor = data['depth'][0].squeeze(-1)
     rgb: torch.Tensor = data['rgb'][0]
     pose: torch.Tensor = data['pose'][0].cpu()
-    intrinsics: torch.Tensor = data['intrinsics'][0]
+    sensor: Sensor = data['sensor'][0]
 
     feature_frame = torch.rand(rgb.shape[0],
                                rgb.shape[1],
@@ -40,11 +40,11 @@ def process_frame(mapper: Mapper, data: Dict[str, torch.Tensor]) -> None:
 
     # Integrate data
     with Timer('add_depth_frame'):
-        mapper.add_depth_frame(depth, pose, intrinsics)
+        mapper.add_depth_frame(depth, pose, sensor)
     with Timer('add_color_frame'):
-        mapper.add_color_frame(rgb, pose, intrinsics)
+        mapper.add_color_frame(rgb, pose, sensor)
     with Timer(f'add_feature_frame (dim: {constants.feature_array_num_elements()})'):
-        mapper.add_feature_frame(feature_frame, pose, intrinsics)
+        mapper.add_feature_frame(feature_frame, pose, sensor)
 
     # Updates
     with Timer('update_color_mesh'):
@@ -82,10 +82,7 @@ def process_frame(mapper: Mapper, data: Dict[str, torch.Tensor]) -> None:
 def run_benchmark() -> None:
     """Run the benchmark."""
     dataset_dir = str(get_sun3d_test_data_dir())
-    dataloader = DataLoader(Sun3dDataset(root=dataset_dir),
-                            batch_size=1,
-                            shuffle=False,
-                            num_workers=0)
+    dataloader = Sun3dDataset.create_dataloader(root_dir=dataset_dir, sequence_name='seq-01')
 
     for _ in range(NUM_DATASET_ITERATIONS):
         mapper = Mapper(voxel_sizes_m=VOXEL_SIZE_M)

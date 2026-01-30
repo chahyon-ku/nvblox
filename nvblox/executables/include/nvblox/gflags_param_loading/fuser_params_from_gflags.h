@@ -54,6 +54,9 @@ DEFINE_string(map_output_path, "", "File in which to save the serialized map.");
 DEFINE_string(dynamic_overlay_path, "",
               "Folder to save the dynamic mask images. Note that these "
               "overlays show the mask before before being post processed.");
+DEFINE_string(ground_plane_output_path, "",
+              "File in which to save the ground plane data (normal and "
+              "height) in YAML format.");
 
 // Subsampling
 DEFINE_int32(projective_frame_subsampling, 0,
@@ -71,6 +74,13 @@ DEFINE_double(
     frame_rate, 0.0f,
     "The frame rate of the input depth frames in Hz. Only used if running "
     "dynamic detection.");
+
+// LiDAR motion compensation
+DEFINE_bool(
+    use_lidar_motion_compensation, true,
+    "If set to true, apply motion compensation to LiDAR scans."
+    "This undistorts the scan by interpolating poses for each point based on "
+    "its timestamp.");
 
 // ============================ GET THE PARAMS ============================
 
@@ -107,7 +117,9 @@ inline void get_global_params_from_gflags(float* voxel_size,
   }
 }
 
-inline void set_fuser_params_from_gflags(Fuser* fuser_ptr) {
+template <typename SensorType, typename SensorDataType>
+inline void set_fuser_params_from_gflags(
+    Fuser<SensorType, SensorDataType>* fuser_ptr) {
   // Dataset flags
   if (!gflags::GetCommandLineFlagInfoOrDie("num_frames").is_default) {
     LOG(INFO) << "Command line parameter found: num_frames = "
@@ -152,6 +164,12 @@ inline void set_fuser_params_from_gflags(Fuser* fuser_ptr) {
               << FLAGS_map_output_path;
     fuser_ptr->map_output_path_ = FLAGS_map_output_path;
   }
+  if (!gflags::GetCommandLineFlagInfoOrDie("ground_plane_output_path")
+           .is_default) {
+    LOG(INFO) << "Command line parameter found: ground_plane_output_path = "
+              << FLAGS_ground_plane_output_path;
+    fuser_ptr->ground_plane_output_path_ = FLAGS_ground_plane_output_path;
+  }
   if (!gflags::GetCommandLineFlagInfoOrDie("dynamic_overlay_path").is_default) {
     LOG(INFO) << "Command line parameter found: dynamic_overlay_path = "
               << FLAGS_dynamic_overlay_path;
@@ -190,6 +208,14 @@ inline void set_fuser_params_from_gflags(Fuser* fuser_ptr) {
     constexpr int kSecondsToMilliSeconds = 1e3;
     fuser_ptr->frame_period_ms_ =
         nvblox::Time(kSecondsToMilliSeconds / FLAGS_frame_rate);
+  }
+  if (!gflags::GetCommandLineFlagInfoOrDie("use_lidar_motion_compensation")
+           .is_default) {
+    LOG(INFO) << "Command line parameter found: "
+                 "use_lidar_motion_compensation = "
+              << FLAGS_use_lidar_motion_compensation;
+    fuser_ptr->use_lidar_motion_compensation_ =
+        FLAGS_use_lidar_motion_compensation;
   }
 }
 

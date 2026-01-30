@@ -36,6 +36,11 @@ bool PlyWriter::write() {
     return false;
   }
 
+  if (timestamps_ms_ != nullptr && points_->size() != timestamps_ms_->size()) {
+    LOG(ERROR) << "Timestamp size does not match point size.";
+    return false;
+  }
+
   if (colors_ != nullptr && points_->size() != colors_->size()) {
     LOG(ERROR) << "Color size does not match point size.";
     return false;
@@ -77,6 +82,10 @@ void PlyWriter::writeHeader() {
     file_ << "property float intensity" << std::endl;
   }
 
+  if (timestamps_ms_) {
+    file_ << "property float t" << std::endl;
+  }
+
   if (colors_) {
     file_ << "property uchar red" << std::endl;
     file_ << "property uchar green" << std::endl;
@@ -106,6 +115,16 @@ void PlyWriter::writePoints() {
 
     if (intensities_) {
       file_ << " " << (*intensities_)[i];
+    }
+
+    if (timestamps_ms_) {
+      // Store timestamps in seconds (float)
+      // Time class stores milliseconds as int64_t, convert to seconds as float
+      constexpr float kMilliSecondsToSeconds = 1e-3f;
+      const float timestamp_seconds =
+          static_cast<float>(static_cast<int64_t>((*timestamps_ms_)[i])) *
+          kMilliSecondsToSeconds;
+      file_ << " " << timestamp_seconds;
     }
 
     if (colors_) {

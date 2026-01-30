@@ -22,6 +22,7 @@ limitations under the License.
 #include "nvblox/integrators/internal/cuda/impl/tsdf_decay_integrator_impl.cuh"
 #include "nvblox/integrators/internal/cuda/impl/view_calculator_impl.cuh"
 #include "nvblox/semantics/internal/cuda/impl/image_projector_impl.cuh"
+#include "nvblox/sensors/internal/cuda/impl/pointcloud_to_depth_conversion_impl.cuh"
 
 // Macro to instantiate all template functions for a given SensorType
 #define NVBLOX_INSTANTIATE_SENSOR(SensorType)                                \
@@ -70,4 +71,12 @@ limitations under the License.
       const DepthImage& depth_frame_C,                                       \
       const FreespaceLayer& freespace_layer_L, const SensorType& sensor,     \
       const Transform& T_L_C);                                               \
+                                                                             \
+  template void depthImageFromPointcloudGPU<SensorType>(                     \
+      const Pointcloud& pointcloud, const Transform& T_L_S_scanStart,        \
+      const SensorType& lidar_sensor,                                        \
+      const bool use_lidar_motion_compensation,                              \
+      const std::optional<Transform>& T_L_S_scanEnd,                         \
+      const std::optional<Time>& scan_duration_ms,                           \
+      DepthImage* depth_image_ptr, const CudaStream& cuda_stream);           \
   }  // namespace nvblox
