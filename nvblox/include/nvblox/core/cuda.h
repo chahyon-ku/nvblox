@@ -16,6 +16,7 @@ limitations under the License.
 
 #ifdef __CUDACC__
 
+#include <cuda/std/functional>
 #include "cub/thread/thread_operators.cuh"
 #include "thrust/functional.h"
 

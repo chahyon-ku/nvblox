@@ -1,5 +1,23 @@
 # Release Notes
 
+## [v.0.0.10] - Date: 2026-04-16
+
+### NvbloxRenderer
+
+This release introduces a native, low-latency visualizer module to nvblox.
+
+**nvblox_renderer** is a Vulkan-based visualization library for nvblox data. It renders depth images, color images, point clouds, and triangle meshes using shared CUDA-Vulkan memory, avoiding unnecessary copies between the GPU compute and graphics pipelines.
+
+### Configurable handling of unobserved voxels in the ESDF
+
+A new `unobserved_esdf_policy` parameter controls how unobserved voxels are treated during ESDF computation:
+
+- `kIgnore` (default, previous behavior): unobserved voxels are marked unobserved in the ESDF, and the ESDF does not propagate through or from them.
+- `kFree`: unobserved voxels are treated as observed free space, allowing ESDF distances to propagate through them.
+- `kOccupied`: unobserved voxels are treated as obstacle surfaces and become ESDF sites, so distances propagate from them.
+
+When using `kFree`, the new `add_negative_truncation_band_sites` parameter marks inside voxels near the negative TSDF truncation distance as sites, eliminating ESDF discontinuities at the observed/unobserved boundary.
+
 ## [v.0.0.9] - Date: 2026-01-27
 
 This release brings a major overhaul of sensor handling to **nvblox**.

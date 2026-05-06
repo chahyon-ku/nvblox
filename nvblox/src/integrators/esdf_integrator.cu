@@ -95,6 +95,12 @@ parameters::ParameterTreeNode EsdfIntegrator::getParameterTree(
                             slice_height_above_plane_m_),
           ParameterTreeNode("slice_height_thickness_m:",
                             slice_height_thickness_m_),
+          ParameterTreeNode("unobserved_esdf_policy:",
+                            toString(unobserved_esdf_policy_)),
+          ParameterTreeNode("add_negative_truncation_band_sites:",
+                            add_negative_truncation_band_sites_),
+          ParameterTreeNode("truncation_distance_vox:",
+                            truncation_distance_vox_),
       });
 }
 
@@ -123,6 +129,12 @@ struct TsdfSiteFunctor {
     return fabsf(tsdf_voxel.distance) <= max_site_distance_m;
   }
 
+  __device__ bool isVoxelNearNegativeTruncationBand(
+      const TsdfVoxel& tsdf_voxel) const {
+    return tsdf_voxel.distance <=
+           -(truncation_distance_m - max_site_distance_m);
+  }
+
   __device__ void updateSquashedExtremumAtomic(const TsdfVoxel& tsdf_voxel,
                                                const bool is_freespace,
                                                TsdfVoxel* current_value) const {
@@ -135,6 +147,7 @@ struct TsdfSiteFunctor {
 
   float min_weight;
   float max_site_distance_m;
+  float truncation_distance_m;
 };
 
 struct OccupancySiteFunctor {
@@ -152,6 +165,12 @@ struct OccupancySiteFunctor {
   __device__ bool isVoxelNearSurface(
       const OccupancyVoxel& occupancy_voxel) const {
     return true;
+  }
+
+  /// Not applicable to occupancy — always returns false.
+  __device__ bool isVoxelNearNegativeTruncationBand(
+      const OccupancyVoxel&) const {
+    return false;
   }
 
   __device__ void updateSquashedExtremumAtomic(
@@ -223,6 +242,11 @@ void EsdfIntegrator::integrateBlocksTemplate(
     EsdfLayer* esdf_layer, const FreespaceLayer* freespace_layer_ptr) {
   timing::Timer esdf_timer("esdf/integrate");
 
+  CHECK(!add_negative_truncation_band_sites_ ||
+        unobserved_esdf_policy_ == UnobservedEsdfPolicy::kFree)
+      << "add_negative_truncation_band_sites requires "
+         "unobserved_esdf_policy == kFree";
+
   if (block_indices.empty()) {
     return;
   }
@@ -286,6 +310,11 @@ void EsdfIntegrator::integrateSliceTemplate(
     const SliceDescriptionType& slice_spec, EsdfLayer* esdf_layer,
     const FreespaceLayer* freespace_layer_ptr) {
   timing::Timer esdf_timer("esdf/integrate_slice");
+
+  CHECK(!add_negative_truncation_band_sites_ ||
+        unobserved_esdf_policy_ == UnobservedEsdfPolicy::kFree)
+      << "add_negative_truncation_band_sites requires "
+         "unobserved_esdf_policy == kFree";
 
   if (block_indices.empty()) {
     return;
@@ -400,22 +429,29 @@ void EsdfIntegrator::allocateBlocksOnCPU(
 // and the currect value of the pass ESDF voxel and updates it.
 template <typename VoxelType, typename SiteFunctorType>
 __device__ void updateEsdfVoxelToChanges(
-    const VoxelType* voxel_ptr,                 // NOLINT
-    const bool is_observed,                     // NOLINT
-    const bool is_freespace,                    // NOLINT
-    const SiteFunctorType& site_functor,        // NOLINT
-    const float max_squared_esdf_distance_vox,  // NOLINT
-    EsdfVoxel* esdf_voxel_ptr,                  // NOLINT
-    bool* cleared,                              // NOLINT
+    const VoxelType* voxel_ptr,                     // NOLINT
+    const bool is_observed,                         // NOLINT
+    const bool is_freespace,                        // NOLINT
+    const SiteFunctorType& site_functor,            // NOLINT
+    const float max_squared_esdf_distance_vox,      // NOLINT
+    const UnobservedEsdfPolicy unobserved_policy,   // NOLINT
+    const bool add_negative_truncation_band_sites,  // NOLINT
+    EsdfVoxel* esdf_voxel_ptr,                      // NOLINT
+    bool* cleared,                                  // NOLINT
     bool* updated) {
   if (is_observed) {
     // Mark as inside if the voxel distance is negative.
     // Note: Voxels being freespace can not be inside an object.
     const bool is_inside =
         site_functor.isVoxelInsideObject(*voxel_ptr) & !is_freespace;
-    // Mark site if inside and close to boundary.
+    // Mark site if inside and:
+    // - close to the surface, or
+    // - (when enabled) close to the negative truncation band.
     const bool is_site =
-        is_inside && site_functor.isVoxelNearSurface(*voxel_ptr);
+        is_inside &&
+        (site_functor.isVoxelNearSurface(*voxel_ptr) ||
+         (add_negative_truncation_band_sites &&
+          site_functor.isVoxelNearNegativeTruncationBand(*voxel_ptr)));
 
     // Handle flips in "is_inside"
     if (esdf_voxel_ptr->is_inside && is_inside == false) {
@@ -454,9 +490,36 @@ __device__ void updateEsdfVoxelToChanges(
     }
     esdf_voxel_ptr->observed = true;
   } else {
-    clearVoxelDevice(esdf_voxel_ptr, max_squared_esdf_distance_vox);
-    *cleared = true;
-    esdf_voxel_ptr->observed = false;
+    // The voxel is unobserved: apply the unobserved policy.
+    if (unobserved_policy == UnobservedEsdfPolicy::kOccupied) {
+      // Treat unobserved voxels as occupied (add as sites).
+      esdf_voxel_ptr->observed = true;
+      esdf_voxel_ptr->is_inside = true;
+      esdf_voxel_ptr->is_site = true;
+      esdf_voxel_ptr->squared_distance_vox = 0.0f;
+      esdf_voxel_ptr->parent_direction.setZero();
+      *updated = true;
+    } else if (unobserved_policy == UnobservedEsdfPolicy::kFree) {
+      // Treat unobserved voxels as free space (propagate distances through).
+      if (esdf_voxel_ptr->is_site || esdf_voxel_ptr->is_inside) {
+        // Somehow the voxel was a site or inside before (should not happen for
+        // unobserved voxels). Mark it to be cleared.
+        clearVoxelDevice(esdf_voxel_ptr, max_squared_esdf_distance_vox);
+        *cleared = true;
+      } else if (!esdf_voxel_ptr->observed) {
+        // This is a brand new voxel.
+        clearVoxelDevice(esdf_voxel_ptr, max_squared_esdf_distance_vox);
+      }
+      // Set the voxel to free space.
+      esdf_voxel_ptr->observed = true;
+      esdf_voxel_ptr->is_inside = false;
+      esdf_voxel_ptr->is_site = false;
+    } else {
+      // Keep unobserved voxels as unobserved
+      clearVoxelDevice(esdf_voxel_ptr, max_squared_esdf_distance_vox);
+      *cleared = true;
+      esdf_voxel_ptr->observed = false;
+    }
   }
 }
 
@@ -470,8 +533,9 @@ __global__ void markAllSitesKernel(
     const Index3DDeviceHashMapType<FreespaceBlock> freespace_block_hash,
     Index3DDeviceHashMapType<EsdfBlock> esdf_block_hash,
     const SiteFunctorType site_functor, float max_squared_esdf_distance_vox,
-    Index3D* updated_vec, int* updated_vec_size, Index3D* to_clear_vec,
-    int* to_clear_vec_size) {
+    const UnobservedEsdfPolicy unobserved_policy,
+    const bool add_negative_truncation_band_sites, Index3D* updated_vec,
+    int* updated_vec_size, Index3D* to_clear_vec, int* to_clear_vec_size) {
   dim3 voxel_index = threadIdx;
   int block_idx = blockIdx.x;
 
@@ -507,26 +571,41 @@ __global__ void markAllSitesKernel(
     }
   }
   __syncthreads();
-  if (block_ptr == nullptr || esdf_block == nullptr) {
-    // We do not check the freespace_block_ptr here.
-    // If the freespace block is not allocated we assume it to not be freespace.
+
+  if (esdf_block == nullptr) {
     return;
   }
 
-  // Get the correct voxel for this index.
-  const VoxelType* voxel_ptr =
-      &block_ptr->voxels[voxel_index.x][voxel_index.y][voxel_index.z];
+  // Early exit for kIgnore with no TSDF block
+  if (block_ptr == nullptr &&
+      unobserved_policy == UnobservedEsdfPolicy::kIgnore) {
+    return;
+  }
+
+  // Get the input voxel pointers and check if it is observed.
+  // Per default (i.e. if the input block does not exist),
+  // we assume the voxel is unobserved.
+  // The corresponding esdf voxel is then updated based on the unobserved
+  // policy.
+  const VoxelType* voxel_ptr = nullptr;
+  bool is_observed = false;
+  if (block_ptr != nullptr) {
+    voxel_ptr = &block_ptr->voxels[voxel_index.x][voxel_index.y][voxel_index.z];
+    is_observed = site_functor.isVoxelObserved(*voxel_ptr);
+  }
+
+  bool is_freespace = isVoxelFreespace(freespace_block_ptr, voxel_index);
+
   EsdfVoxel* esdf_voxel_ptr =
       &esdf_block->voxels[voxel_index.x][voxel_index.y][voxel_index.z];
 
-  const bool is_observed = site_functor.isVoxelObserved(*voxel_ptr);
-  const bool is_freespace = isVoxelFreespace(freespace_block_ptr, voxel_index);
-
   // Update the ESDF voxel based on changes to the input layer.
   updateEsdfVoxelToChanges(voxel_ptr, is_observed, is_freespace, site_functor,
-                           max_squared_esdf_distance_vox, esdf_voxel_ptr,
+                           max_squared_esdf_distance_vox, unobserved_policy,
+                           add_negative_truncation_band_sites, esdf_voxel_ptr,
                            &cleared, &updated);
   __syncthreads();
+
   // Now output the updated and cleared.
   // Do this once per block.
   if (threadIdx.x == 1 && threadIdx.y == 1 && threadIdx.z == 1) {
@@ -611,11 +690,17 @@ __device__ bool updateSingleNeighbor(const EsdfBlock* esdf_block,
       &neighbor_block
            ->voxels[neighbor_voxel_index.x()][neighbor_voxel_index.y()]
                    [neighbor_voxel_index.z()];
+
+  // Neighbor is not updated when:
+  // - Source or neighbor is unobserved
+  // - Neighbor is a site
+  // - Source is too far from neighbor
   if (!esdf_voxel->observed || !neighbor_voxel->observed ||
       neighbor_voxel->is_site ||
       esdf_voxel->squared_distance_vox >= max_squared_esdf_distance_vox) {
     return false;
   }
+
   // Determine if we can update this.
   Eigen::Vector3i potential_direction = esdf_voxel->parent_direction;
   potential_direction(axis) -= direction;
@@ -672,6 +757,7 @@ TsdfSiteFunctor EsdfIntegrator::getSiteFunctor(const TsdfLayer& layer) {
   functor.min_weight = tsdf_min_weight_;
   functor.max_site_distance_m =
       max_tsdf_site_distance_vox_ * layer.voxel_size();
+  functor.truncation_distance_m = truncation_distance_vox_ * layer.voxel_size();
   return functor;
 }
 
@@ -729,6 +815,8 @@ void EsdfIntegrator::markAllSites(const LayerType& layer,
       esdf_layer_view.getHash().impl_,           // NOLINT
       site_functor,                              // NOLINT
       max_squared_esdf_distance_vox,             // NOLINT
+      unobserved_esdf_policy_,                   // NOLINT
+      add_negative_truncation_band_sites_,       // NOLINT
       blocks_with_sites->data(),                 // NOLINT
       updated_counter_device_.get(),             // NOLINT
       cleared_blocks->data(),                    // NOLINT
@@ -757,6 +845,8 @@ __global__ void markSitesInSliceKernel(
     const Index3DDeviceHashMapType<FreespaceBlock> freespace_block_hash,
     Index3DDeviceHashMapType<EsdfBlock> esdf_block_hash,
     const SiteFunctorType site_functor, float max_squared_esdf_distance_vox,
+    const UnobservedEsdfPolicy unobserved_policy,
+    const bool add_negative_truncation_band_sites,
     int output_slice_voxel_index_z, float block_size,
     // ConstantZColumnBoundsGetter slice_bounds_functor,
     const SlicerType slicer, Index3D* updated_vec, int* updated_vec_size,
@@ -897,9 +987,10 @@ __global__ void markSitesInSliceKernel(
     constexpr bool kNotFreespace = false;
 
     // Update the ESDF voxel based on changes to the input layer.
-    updateEsdfVoxelToChanges(voxel_ptr, is_observed, kNotFreespace,
-                             site_functor, max_squared_esdf_distance_vox,
-                             esdf_voxel_ptr, &cleared, &updated);
+    updateEsdfVoxelToChanges(
+        voxel_ptr, is_observed, kNotFreespace, site_functor,
+        max_squared_esdf_distance_vox, unobserved_policy,
+        add_negative_truncation_band_sites, esdf_voxel_ptr, &cleared, &updated);
   }
 
   __syncthreads();
@@ -1032,18 +1123,20 @@ void EsdfIntegrator::markSitesInSlice(
   // Call the kernel!
   markSitesInSliceKernel<BlockType>
       <<<dim_block, dim_threads, 0, *cuda_stream_>>>(
-          block_indices_device_.data(),     // NOLINT
-          tsdf_layer_view.getHash().impl_,  // NOLINT
-          freespace_hash_map,               // NOLINT
-          esdf_layer_view.getHash().impl_,  // NOLINT
-          site_functor,                     // NOLINT
-          max_squared_esdf_distance_vox,    // NOLINT
-          output_slice_voxel_index_z,       // NOLINT
-          input_layer.block_size(),         // NOLINT
-          slicer,                           // NOLINT
-          updated_blocks->data(),           // NOLINT
-          updated_counter_device_.get(),    // NOLINT
-          cleared_blocks->data(),           // NOLINT
+          block_indices_device_.data(),         // NOLINT
+          tsdf_layer_view.getHash().impl_,      // NOLINT
+          freespace_hash_map,                   // NOLINT
+          esdf_layer_view.getHash().impl_,      // NOLINT
+          site_functor,                         // NOLINT
+          max_squared_esdf_distance_vox,        // NOLINT
+          unobserved_esdf_policy_,              // NOLINT
+          add_negative_truncation_band_sites_,  // NOLINT
+          output_slice_voxel_index_z,           // NOLINT
+          input_layer.block_size(),             // NOLINT
+          slicer,                               // NOLINT
+          updated_blocks->data(),               // NOLINT
+          updated_counter_device_.get(),        // NOLINT
+          cleared_blocks->data(),               // NOLINT
           cleared_counter_device_.get());
   checkCudaErrors(cudaPeekAtLastError());
 

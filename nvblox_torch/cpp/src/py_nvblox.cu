@@ -114,7 +114,23 @@ TORCH_LIBRARY(pynvblox, m) {
                get_projective_appearance_integrator_measurement_weight)
       .def("set_projective_appearance_integrator_measurement_weight",
            &ProjectiveIntegratorParams::
-               set_projective_appearance_integrator_measurement_weight);
+               set_projective_appearance_integrator_measurement_weight)
+      .def("get_projective_dynamic_tsdf_integrator_discrepancy_threshold_m",
+           &ProjectiveIntegratorParams::
+               get_projective_dynamic_tsdf_integrator_discrepancy_threshold_m)
+      .def("set_projective_dynamic_tsdf_integrator_discrepancy_threshold_m",
+           &ProjectiveIntegratorParams::
+               set_projective_dynamic_tsdf_integrator_discrepancy_threshold_m)
+      .def(
+          "get_projective_dynamic_tsdf_integrator_dynamic_discrepancy_min_"
+          "weight",
+          &ProjectiveIntegratorParams::
+              get_projective_dynamic_tsdf_integrator_dynamic_discrepancy_min_weight)
+      .def(
+          "set_projective_dynamic_tsdf_integrator_dynamic_discrepancy_min_"
+          "weight",
+          &ProjectiveIntegratorParams::
+              set_projective_dynamic_tsdf_integrator_dynamic_discrepancy_min_weight);
 
   m.class_<MeshIntegratorParams>("MeshIntegratorParams")
       .def(torch::init())
@@ -125,7 +141,11 @@ TORCH_LIBRARY(pynvblox, m) {
       .def("get_mesh_integrator_weld_vertices",
            &MeshIntegratorParams::get_mesh_integrator_weld_vertices)
       .def("set_mesh_integrator_weld_vertices",
-           &MeshIntegratorParams::set_mesh_integrator_weld_vertices);
+           &MeshIntegratorParams::set_mesh_integrator_weld_vertices)
+      .def("get_mesh_integrator_max_flat_mesh_triangles",
+           &MeshIntegratorParams::get_mesh_integrator_max_flat_mesh_triangles)
+      .def("set_mesh_integrator_max_flat_mesh_triangles",
+           &MeshIntegratorParams::set_mesh_integrator_max_flat_mesh_triangles);
 
   m.class_<DecayIntegratorBaseParams>("DecayIntegratorBaseParams")
       .def(torch::init())
@@ -205,7 +225,15 @@ TORCH_LIBRARY(pynvblox, m) {
       .def("get_slice_height_thickness_m",
            &EsdfIntegratorParams::get_slice_height_thickness_m)
       .def("set_slice_height_thickness_m",
-           &EsdfIntegratorParams::set_slice_height_thickness_m);
+           &EsdfIntegratorParams::set_slice_height_thickness_m)
+      .def("get_unobserved_esdf_policy",
+           &EsdfIntegratorParams::get_unobserved_esdf_policy)
+      .def("set_unobserved_esdf_policy",
+           &EsdfIntegratorParams::set_unobserved_esdf_policy)
+      .def("get_add_negative_truncation_band_sites",
+           &EsdfIntegratorParams::get_add_negative_truncation_band_sites)
+      .def("set_add_negative_truncation_band_sites",
+           &EsdfIntegratorParams::set_add_negative_truncation_band_sites);
 
   m.class_<ViewCalculatorParams>("ViewCalculatorParams")
       .def(torch::init())

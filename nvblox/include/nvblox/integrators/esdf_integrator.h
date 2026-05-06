@@ -22,6 +22,7 @@ limitations under the License.
 #include "nvblox/core/unified_vector.h"
 #include "nvblox/geometry/plane.h"
 #include "nvblox/integrators/esdf_integrator_params.h"
+#include "nvblox/integrators/projective_integrator_params.h"
 #include "nvblox/map/blox.h"
 #include "nvblox/map/common_names.h"
 #include "nvblox/map/layer.h"
@@ -282,6 +283,48 @@ class EsdfIntegrator {
     slice_height_thickness_m_ = slice_height_thickness_m;
   }
 
+  /// A parameter getter
+  /// The policy for how unobserved voxels are treated during ESDF computation.
+  /// @returns the unobserved policy
+  UnobservedEsdfPolicy unobserved_esdf_policy() const {
+    return unobserved_esdf_policy_;
+  }
+
+  /// A parameter setter
+  /// See unobserved_esdf_policy().
+  /// @param policy The policy to apply for unobserved voxels.
+  void unobserved_esdf_policy(const UnobservedEsdfPolicy policy) {
+    unobserved_esdf_policy_ = policy;
+  }
+
+  /// A parameter getter
+  /// Whether to mark inside voxels near the negative TSDF truncation distance
+  /// as sites, creating a surface at the observed/unobserved boundary.
+  /// @returns add_negative_truncation_band_sites
+  bool add_negative_truncation_band_sites() const {
+    return add_negative_truncation_band_sites_;
+  }
+
+  /// A parameter setter
+  /// See add_negative_truncation_band_sites().
+  /// @param value Whether to add sites at the negative truncation band.
+  void add_negative_truncation_band_sites(const bool value) {
+    add_negative_truncation_band_sites_ = value;
+  }
+
+  /// The TSDF truncation distance in voxels. Must be set to match the
+  /// projective integrator's truncation distance when
+  /// add_negative_truncation_band_sites is true.
+  /// @returns truncation_distance_vox
+  float truncation_distance_vox() const { return truncation_distance_vox_; }
+
+  /// See truncation_distance_vox().
+  /// @param value The TSDF truncation distance in voxels.
+  void truncation_distance_vox(const float value) {
+    CHECK_GT(value, 0.0f);
+    truncation_distance_vox_ = value;
+  }
+
   /// Return the parameter tree.
   /// @return the parameter tree
   virtual parameters::ParameterTreeNode getParameterTree(
@@ -373,6 +416,19 @@ class EsdfIntegrator {
   /// @brief OccupancyLayer related parameter
   /// The log odds value greater than which we consider a voxel occupied
   float occupied_threshold_log_odds_ = logOddsFromProbability(0.5f);
+
+  /// @brief Policy for unobserved voxels in the ESDF computation.
+  UnobservedEsdfPolicy unobserved_esdf_policy_ =
+      kUnobservedEsdfPolicyParamDesc.default_value;
+
+  /// @brief Whether to mark inside voxels at the negative truncation band as
+  /// sites.
+  bool add_negative_truncation_band_sites_ =
+      kAddNegativeTruncationBandSitesParamDesc.default_value;
+
+  /// @brief TSDF truncation distance in voxels (for truncation boundary sites).
+  float truncation_distance_vox_ =
+      kProjectiveIntegratorTruncationDistanceVoxParamDesc.default_value;
 
   // State.
   std::shared_ptr<CudaStream> cuda_stream_;

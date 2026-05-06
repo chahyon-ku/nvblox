@@ -50,8 +50,8 @@ __global__ void setToZero(Index3DDeviceHashMapType<BlockType> block_hash) {
   int idx = threadIdx.x + blockIdx.x * blockDim.x;
 
   if (idx < block_hash.max_size()) {
-    memset(block_hash.begin() + idx, 0,
-           sizeof(thrust::pair<Index3D, BlockType*>));
+    ::memset(block_hash.begin() + idx, 0,
+             sizeof(thrust::pair<Index3D, BlockType*>));
   }
 }
 

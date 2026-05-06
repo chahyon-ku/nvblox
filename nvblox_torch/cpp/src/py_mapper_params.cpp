@@ -48,6 +48,21 @@ nvblox::WorkspaceBoundsType workspace_bounds_type_from_string(
   }
 }
 
+nvblox::UnobservedEsdfPolicy unobserved_esdf_policy_from_string(
+    const std::string& policy_string) {
+  if (policy_string == "kIgnore") {
+    return nvblox::UnobservedEsdfPolicy::kIgnore;
+  } else if (policy_string == "kFree") {
+    return nvblox::UnobservedEsdfPolicy::kFree;
+  } else if (policy_string == "kOccupied") {
+    return nvblox::UnobservedEsdfPolicy::kOccupied;
+  } else {
+    NVBLOX_ABORT(std::string("Unrecognized unobserved ESDF policy: ") +
+                 policy_string);
+    return nvblox::UnobservedEsdfPolicy::kIgnore;
+  }
+}
+
 /*****************************
  * PROJECTIVE INTEGRATOR PARAMS
  ******************************/
@@ -128,6 +143,32 @@ void ProjectiveIntegratorParams::
       static_cast<float>(value);
 }
 
+double ProjectiveIntegratorParams::
+    get_projective_dynamic_tsdf_integrator_discrepancy_threshold_m() const {
+  return static_cast<double>(
+      params_->projective_dynamic_tsdf_integrator_discrepancy_threshold_m);
+}
+void ProjectiveIntegratorParams::
+    set_projective_dynamic_tsdf_integrator_discrepancy_threshold_m(
+        double value) {
+  params_->projective_dynamic_tsdf_integrator_discrepancy_threshold_m =
+      static_cast<float>(value);
+}
+
+double ProjectiveIntegratorParams::
+    get_projective_dynamic_tsdf_integrator_dynamic_discrepancy_min_weight()
+        const {
+  return static_cast<double>(
+      params_
+          ->projective_dynamic_tsdf_integrator_dynamic_discrepancy_min_weight);
+}
+void ProjectiveIntegratorParams::
+    set_projective_dynamic_tsdf_integrator_dynamic_discrepancy_min_weight(
+        double value) {
+  params_->projective_dynamic_tsdf_integrator_dynamic_discrepancy_min_weight =
+      static_cast<float>(value);
+}
+
 /*****************************
  * MESH INTEGRATOR PARAMS
  ******************************/
@@ -146,6 +187,16 @@ bool MeshIntegratorParams::get_mesh_integrator_weld_vertices() const {
 
 void MeshIntegratorParams::set_mesh_integrator_weld_vertices(bool value) {
   params_->mesh_integrator_weld_vertices = value;
+}
+
+int64_t MeshIntegratorParams::get_mesh_integrator_max_flat_mesh_triangles()
+    const {
+  return static_cast<int64_t>(params_->mesh_integrator_max_flat_mesh_triangles);
+}
+
+void MeshIntegratorParams::set_mesh_integrator_max_flat_mesh_triangles(
+    int64_t value) {
+  params_->mesh_integrator_max_flat_mesh_triangles = static_cast<int>(value);
 }
 
 /*****************************
@@ -294,6 +345,22 @@ double EsdfIntegratorParams::get_slice_height_thickness_m() const {
 }
 void EsdfIntegratorParams::set_slice_height_thickness_m(double value) const {
   params_->slice_height_thickness_m = static_cast<float>(value);
+}
+
+std::string EsdfIntegratorParams::get_unobserved_esdf_policy() const {
+  return nvblox::toString(params_->unobserved_esdf_policy.get());
+}
+void EsdfIntegratorParams::set_unobserved_esdf_policy(
+    const std::string& value) const {
+  params_->unobserved_esdf_policy = unobserved_esdf_policy_from_string(value);
+}
+
+bool EsdfIntegratorParams::get_add_negative_truncation_band_sites() const {
+  return params_->add_negative_truncation_band_sites;
+}
+void EsdfIntegratorParams::set_add_negative_truncation_band_sites(
+    bool value) const {
+  params_->add_negative_truncation_band_sites = value;
 }
 
 /*****************************

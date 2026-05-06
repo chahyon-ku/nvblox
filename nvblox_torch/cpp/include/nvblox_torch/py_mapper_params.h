@@ -55,6 +55,15 @@ struct ProjectiveIntegratorParams : torch::CustomClassHolder {
   double get_projective_appearance_integrator_measurement_weight() const;
   void set_projective_appearance_integrator_measurement_weight(double value);
 
+  double get_projective_dynamic_tsdf_integrator_discrepancy_threshold_m() const;
+  void set_projective_dynamic_tsdf_integrator_discrepancy_threshold_m(
+      double value);
+
+  double get_projective_dynamic_tsdf_integrator_dynamic_discrepancy_min_weight()
+      const;
+  void set_projective_dynamic_tsdf_integrator_dynamic_discrepancy_min_weight(
+      double value);
+
   std::shared_ptr<nvblox::ProjectiveIntegratorParams> params_;
 };
 
@@ -70,6 +79,9 @@ struct MeshIntegratorParams : torch::CustomClassHolder {
 
   bool get_mesh_integrator_weld_vertices() const;
   void set_mesh_integrator_weld_vertices(bool value);
+
+  int64_t get_mesh_integrator_max_flat_mesh_triangles() const;
+  void set_mesh_integrator_max_flat_mesh_triangles(int64_t value);
 
   std::shared_ptr<nvblox::MeshIntegratorParams> params_;
 };
@@ -160,6 +172,12 @@ struct EsdfIntegratorParams : torch::CustomClassHolder {
 
   double get_slice_height_thickness_m() const;
   void set_slice_height_thickness_m(double value) const;
+
+  std::string get_unobserved_esdf_policy() const;
+  void set_unobserved_esdf_policy(const std::string& value) const;
+
+  bool get_add_negative_truncation_band_sites() const;
+  void set_add_negative_truncation_band_sites(bool value) const;
 
   std::shared_ptr<nvblox::EsdfIntegratorParams> params_;
 };
