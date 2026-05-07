@@ -100,7 +100,6 @@ class ColorMesh(Mesh):
         mesh_o3d.vertex_colors = o3d.utility.Vector3dVector(vertex_colors_np)
         mesh_o3d.triangles = o3d.utility.Vector3iVector(triangles_np)
 
-        mesh_o3d.compute_vertex_normals()
         return mesh_o3d
 
     def save(self, mesh_fname: str) -> None:

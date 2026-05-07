@@ -42,6 +42,8 @@ Mapper::Mapper(float voxel_size_m,
       feature_integrator_(cuda_stream),
       color_mesh_integrator_(cuda_stream),
       feature_mesh_integrator_(cuda_stream),
+      color_flat_mesh_integrator_(cuda_stream),
+      feature_flat_mesh_integrator_(cuda_stream),
       esdf_integrator_(cuda_stream),
       depth_preprocessor_(cuda_stream) {
   layers_ = LayerCake::create<TsdfLayer, ColorLayer, FeatureLayer,
@@ -73,6 +75,8 @@ Mapper::Mapper(const std::string& map_filepath,
       feature_integrator_(cuda_stream),
       color_mesh_integrator_(cuda_stream),
       feature_mesh_integrator_(cuda_stream),
+      color_flat_mesh_integrator_(cuda_stream),
+      feature_flat_mesh_integrator_(cuda_stream),
       esdf_integrator_(cuda_stream),
       depth_preprocessor_(cuda_stream) {
   loadMap(map_filepath, block_memory_pool_params);
@@ -101,6 +105,13 @@ void Mapper::setMapperParams(const MapperParams& params) {
       params.esdf_integrator_params.esdf_integrator_min_weight);
   esdf_integrator().max_site_distance_vox(
       params.esdf_integrator_params.esdf_integrator_max_site_distance_vox);
+  esdf_integrator().unobserved_esdf_policy(
+      params.esdf_integrator_params.unobserved_esdf_policy);
+  esdf_integrator().add_negative_truncation_band_sites(
+      params.esdf_integrator_params.add_negative_truncation_band_sites);
+  esdf_integrator().truncation_distance_vox(
+      params.projective_integrator_params
+          .projective_integrator_truncation_distance_vox);
 
   // ======= PROJECTIVE INTEGRATOR (TSDF/COLOR/OCCUPANCY)
   // max integration distance
@@ -237,6 +248,16 @@ void Mapper::setMapperParams(const MapperParams& params) {
       params.mesh_integrator_params.mesh_integrator_min_weight);
   feature_mesh_integrator().weld_vertices(
       params.mesh_integrator_params.mesh_integrator_weld_vertices);
+
+  // ======= FLAT MESH INTEGRATOR =======
+  color_flat_mesh_integrator().min_weight(
+      params.mesh_integrator_params.mesh_integrator_min_weight);
+  color_flat_mesh_integrator().max_num_triangles(
+      params.mesh_integrator_params.mesh_integrator_max_flat_mesh_triangles);
+  feature_flat_mesh_integrator().min_weight(
+      params.mesh_integrator_params.mesh_integrator_min_weight);
+  feature_flat_mesh_integrator().max_num_triangles(
+      params.mesh_integrator_params.mesh_integrator_max_flat_mesh_triangles);
 
   // ======= DECAY INTEGRATOR (TSDF/OCCUPANCY)=======
   tsdf_decay_integrator().deallocate_decayed_blocks(
@@ -403,6 +424,37 @@ void Mapper::updateFeatureMesh(UpdateFullLayer update_full_layer) {
 void Mapper::updateColorMesh(UpdateFullLayer update_full_layer) {
   updateMeshTemplate(color_mesh_integrator(), update_full_layer,
                      BlocksToUpdateType::kColorMesh);
+}
+
+std::vector<Index3D> Mapper::getFrustumFilteredIndices(const Camera& camera,
+                                                       const Transform& T_L_C,
+                                                       float max_depth) {
+  const float block_size = layers_.get<TsdfLayer>().block_size();
+  const Frustum frustum = camera.getViewFrustum(T_L_C, 0.0f, max_depth);
+  return layers_.get<TsdfLayer>().getBlockIndicesIf([&](const Index3D& idx) {
+    return frustum.isAABBInView(getAABBOfBlock(block_size, idx));
+  });
+}
+
+void Mapper::updateFlatColorMeshGeometryOnly() {
+  if (!hasTsdfLayer(projective_layer_type_)) return;
+  timing::Timer timer("mapper/update_flat_mesh");
+  const auto block_indices = layers_.get<TsdfLayer>().getAllBlockIndices();
+  color_flat_mesh_integrator_.integrateBlocks(layers_.get<TsdfLayer>(),
+                                              block_indices, &flat_color_mesh_);
+}
+
+void Mapper::updateFlatColorMeshGeometryOnly(const Camera& camera,
+                                             const Transform& T_L_C,
+                                             float max_depth) {
+  if (!hasTsdfLayer(projective_layer_type_)) return;
+  timing::Timer timer("mapper/update_flat_mesh");
+  timing::Timer frustum_timer("mapper/update_flat_mesh/frustum_cull");
+  const auto block_indices =
+      getFrustumFilteredIndices(camera, T_L_C, max_depth);
+  frustum_timer.Stop();
+  color_flat_mesh_integrator_.integrateBlocks(layers_.get<TsdfLayer>(),
+                                              block_indices, &flat_color_mesh_);
 }
 
 void Mapper::updateEsdf(UpdateFullLayer update_full_layer) {
@@ -733,6 +785,10 @@ parameters::ParameterTreeNode Mapper::getParameterTree(
        esdf_integrator_.getParameterTree(),
        color_mesh_integrator_.getParameterTree(),
        feature_mesh_integrator_.getParameterTree(),
+       color_flat_mesh_integrator_.getParameterTree(
+           "color_flat_mesh_integrator"),
+       feature_flat_mesh_integrator_.getParameterTree(
+           "feature_flat_mesh_integrator"),
        occupancy_decay_integrator_.getParameterTree(),
        tsdf_decay_integrator_.getParameterTree(),
        freespace_integrator_.getParameterTree()});
@@ -880,6 +936,19 @@ void Mapper::serializeSelectedLayers(
 
 void Mapper::markBlocksForUpdate(const std::vector<Index3D>& blocks) {
   blocks_to_update_tracker_.addBlocksToUpdate(blocks);
+}
+
+void Mapper::markBlocksForUpdate(
+    const std::vector<Index3D>& blocks,
+    const std::vector<BlocksToUpdateType>& block_types) {
+  blocks_to_update_tracker_.addBlocksToUpdate(blocks, block_types);
+}
+
+void Mapper::startBlockTracking(BlocksToUpdateType type) {
+  // Initialize the tracking state and transition it to incremental mode so
+  // that subsequent addBlocksToUpdate() calls for this type are accepted.
+  blocks_to_update_tracker_.getBlocksToUpdate(type);
+  blocks_to_update_tracker_.markBlocksAsUpdated(type);
 }
 
 void Mapper::updateFreespace(Time update_time_ms,

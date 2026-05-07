@@ -77,7 +77,18 @@ class BuildImage(DockerImage):
         # Setup args to cmake
         cmake_args = f'-DCMAKE_CUDA_ARCHITECTURES={cuda_arch} -DWARNING_AS_ERROR=1'
         if self.args.gcc_sanitizer == 1:
-            cmake_args += ' -DCMAKE_BUILD_TYPE=Debug -DUSE_SANITIZER=yes'
+            # libtorch's CUDA caching allocator is incompatible with gcc
+            # AddressSanitizer (the nvblox_torch cpp tests fail with ASan
+            # errors). Match the legacy Jenkins sanitizer build and skip the
+            # pytorch wrapper entirely under sanitizer.
+            cmake_args += (' -DCMAKE_BUILD_TYPE=Debug -DUSE_SANITIZER=yes'
+                           ' -DBUILD_PYTORCH_WRAPPER=0')
+
+        # nvblox_torch is deprecated on CUDA 11. Skip building the pytorch
+        # wrapper there; the core C++ library is still built and tested.
+        # nvblox_renderer also requires CUDA >= 12.
+        if self.args.cuda_version == CudaVersion.CUDA_11:
+            cmake_args += ' -DBUILD_PYTORCH_WRAPPER=0 -DBUILD_RENDERER=0'
 
         # Setup args to docker build
         args = [f'CMAKE_ARGS={cmake_args}']
@@ -139,7 +150,7 @@ class CppUnitTests(TestBase):
         return BuildImage(self.args)
 
     def get_cwd(self) -> str:
-        return '/nvblox/build/nvblox/tests'
+        return '/nvblox/build'
 
 
 class PythonUnitTests(TestBase):
@@ -202,6 +213,19 @@ class RealsenseTest(TestBase):
         return RealsenseImage(self.args)
 
 
+class BazelTests(TestBase):
+    """Run the Bazel tests"""
+
+    def get_command(self) -> str:
+        return 'bash ci/install_bazel.sh && bazel test -c opt //nvblox/tests/...'
+
+    def image(self) -> DockerImage:
+        return BuildImage(self.args)
+
+    def get_cwd(self) -> str:
+        return '/nvblox/'
+
+
 # Map cmd line docker image arg to image class.
 ARG_TO_IMAGE: Dict[str, Type[DockerImage]] = {
     'deps': DependenciesImage,
@@ -217,6 +241,7 @@ ARG_TO_TEST: Dict[str, Type[TestBase]] = {
     'cuda-sanitizer': CudaSanitizer,
     'stability': StabilityTest,
     'realsense': RealsenseTest,
+    'bazel': BazelTests,
 }
 
 

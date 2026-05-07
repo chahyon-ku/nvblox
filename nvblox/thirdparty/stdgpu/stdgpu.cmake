@@ -22,7 +22,10 @@ else()
       # Patch that prepends stdgpu namespace to conflicting cuda functions.
       ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/stdgpu/stdgpu_fix_cuda12_6.patch
       # Patch that fixes deprecated calls in CUDA13
-      ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/stdgpu/stdgpu_fix_cuda13_0.patch)
+      ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/stdgpu/stdgpu_fix_cuda13_0.patch
+      # Patch that fixes is_proxy_reference incompatibility with thrust 3.1+
+      # (CUDA 13.1+)
+      ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/stdgpu/stdgpu_fix_cuda13_1.patch)
 
   FetchContent_Declare(
     ext_stdgpu

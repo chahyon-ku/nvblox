@@ -19,6 +19,30 @@ limitations under the License.
 
 namespace nvblox {
 
+/// Policy for how unobserved voxels are treated during ESDF computation.
+/// - kIgnore: Unobserved voxels (i.e. no tsdf voxel available or low weight)
+///            are set unobserved in the ESDF.
+///            The ESDF will not propagate through or from unobserved space.
+/// - kFree:   Unobserved voxels are treated as observed free space.
+///            ESDF distances propagate through them.
+/// - kOccupied: Unobserved voxels are treated as occupied obstacle surfaces.
+///              They become ESDF sites and nearby voxels get correct distances.
+enum class UnobservedEsdfPolicy { kIgnore, kFree, kOccupied };
+
+template <>
+inline std::string toString(const UnobservedEsdfPolicy& policy) {
+  switch (policy) {
+    case UnobservedEsdfPolicy::kIgnore:
+      return "kIgnore";
+    case UnobservedEsdfPolicy::kFree:
+      return "kFree";
+    case UnobservedEsdfPolicy::kOccupied:
+      return "kOccupied";
+    default:
+      return "unknown";
+  }
+}
+
 constexpr Param<float>::Description kEsdfIntegratorMaxDistanceMParamDesc{
     "esdf_integrator_max_distance_m", 2.f,
     "Maximum distance to compute the ESDF up to, in meters."};
@@ -50,6 +74,20 @@ constexpr Param<float>::Description kSliceHeightThicknessMParamDesc{
     "slice_height_thickness_m", 0.1,
     "The height of the slice (in meters) above the lower slice."};
 
+constexpr Param<UnobservedEsdfPolicy>::Description
+    kUnobservedEsdfPolicyParamDesc{
+        "unobserved_esdf_policy", UnobservedEsdfPolicy::kIgnore,
+        "Policy for unobserved voxels during ESDF computation. "
+        "'kIgnore' skips them, 'kFree' treats them as free space, "
+        "'kOccupied' treats them as obstacle surfaces."};
+
+constexpr Param<bool>::Description kAddNegativeTruncationBandSitesParamDesc{
+    "add_negative_truncation_band_sites", false,
+    "If true, inside voxels near the negative TSDF truncation distance "
+    "are marked as sites, creating a surface at the observed/unobserved "
+    "boundary. Avoids discontinuities in the ESDF at the boundary. "
+    "Only valid with unobserved_esdf_policy == kFree."};
+
 struct EsdfIntegratorParams {
   Param<float> esdf_integrator_max_distance_m{
       kEsdfIntegratorMaxDistanceMParamDesc};
@@ -61,6 +99,10 @@ struct EsdfIntegratorParams {
   Param<float> esdf_slice_height{kEsdfSliceHeightParamDesc};
   Param<float> slice_height_above_plane_m{kSliceHeightAbovePlaneMParamDesc};
   Param<float> slice_height_thickness_m{kSliceHeightThicknessMParamDesc};
+  Param<UnobservedEsdfPolicy> unobserved_esdf_policy{
+      kUnobservedEsdfPolicyParamDesc};
+  Param<bool> add_negative_truncation_band_sites{
+      kAddNegativeTruncationBandSitesParamDesc};
 };
 
 }  // namespace nvblox
