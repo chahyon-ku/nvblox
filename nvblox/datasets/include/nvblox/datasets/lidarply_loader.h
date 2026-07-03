@@ -68,15 +68,17 @@ class DataLoader : public LidarDataLoaderInterface {
   /// Layer frame at scan end.
   ///@param[out] scan_duration_ms_ptr Lidar scan duration in milliseconds.
   ///@return Whether loading succeeded.
-  DataLoadResult loadNext(Pointcloud* pointcloud_ptr,            // NOLINT
-                          Transform* T_L_S_scanStart_ptr,        // NOLINT
-                          Lidar* lidar_ptr,                      // NOLINT
-                          ColorImage*,                           // NOLINT
-                          Transform*,                            // NOLINT
-                          Camera*,                               // NOLINT
-                          Time* frame_timestamp_ms_ptr,          // NOLINT
-                          Transform* T_L_S_scanEnd_ptr,          // NOLINT
-                          Time* scan_duration_ms_ptr) override;  // NOLINT
+  DataLoadResult loadNext(Pointcloud* pointcloud_ptr,      // NOLINT
+                          Transform* T_L_S_scanStart_ptr,  // NOLINT
+                          Lidar* lidar_ptr,                // NOLINT
+                          ColorImage*,                     // NOLINT
+                          Transform*,                      // NOLINT
+                          Camera*,                         // NOLINT
+                          Time* frame_timestamp_ms_ptr,    // NOLINT
+                          Transform* T_L_S_scanEnd_ptr,    // NOLINT
+                          Time* scan_duration_ms_ptr,      // NOLINT
+                          MonoImage*,                      // NOLINT
+                          MonoImage*) override;            // NOLINT
 
  protected:
   /// Helper function to load pose and timestamp for a given frame number

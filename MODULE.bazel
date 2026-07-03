@@ -30,7 +30,7 @@ register_toolchains("@nvblox//bazel/toolchains:cc_toolchain_for_aarch64_gcc_11")
 
 bazel_dep(name = "platforms", version = "1.0.0")
 bazel_dep(name = "bazel_skylib", version = "1.7.1")
-bazel_dep(name = "rules_cc", version = "0.1.1")
+bazel_dep(name = "rules_cc", version = "0.2.14")
 bazel_dep(name = "eigen", version = "3.4.0.bcr.3")
 bazel_dep(name = "gflags", version = "2.2.2")
 bazel_dep(name = "glog", version = "0.7.1")
@@ -72,31 +72,11 @@ http_archive(
 # CUDA Dependencies
 #################################################
 
-bazel_dep(name = "rules_cuda", version = "0.2.5")
-
-# TODO: Remove this override when this PR is merged and released
-# https://github.com/bazel-contrib/rules_cuda/pull/422
-git_override(
-    module_name = "rules_cuda",
-    branch = "csaint/multi-arch",
-    remote = "https://github.com/charleysaintNV/rules_cuda.git",
-)
+bazel_dep(name = "rules_cuda", version = "0.3.0")
 
 cuda = use_extension("@rules_cuda//cuda:extensions.bzl", "toolchain")
 cuda.redist_json(
-    name = "cuda_13_0_2",
-    platforms = [
-        "linux-x86_64",
-        "linux-sbsa",
-    ],
-    version = "13.0.2",
-)
-cuda.redist_json(
     name = "cuda_13_0_0",
-    platforms = [
-        "linux-x86_64",
-        "linux-sbsa",
-    ],
     version = "13.0.0",
 )
 cuda.toolkit(name = "cuda")

@@ -36,6 +36,8 @@ limitations under the License.
 //
 // Other optional parameters:
 //  --mesh_output_path <out_dir>/mesh.ply
+//  --exclude_mask_dir <mask_dir>  (static modes only; non-zero=exclude,
+//  0=keep)
 //  --nouse_2d_esdf_mode
 //  --num_frames 20
 //  --fit_to_z0 (align all poses to z=0 plane for horizontal mesh)
@@ -71,6 +73,11 @@ DEFINE_string(frames_meta_file, "",
 
 DEFINE_bool(fit_to_z0, false,
             "Fit all poses to z=0 plane for horizontal mesh output");
+
+DEFINE_string(exclude_mask_dir, "",
+              "Optional: directory of binary masks (non-zero=exclude, "
+              "0=keep) for depth and color. Static mapping only; ignored "
+              "with --mapping_type_dynamic.");
 
 namespace nvblox {
 
@@ -148,7 +155,8 @@ int main(int argc, char* argv[]) {
   std::unique_ptr<nvblox::CameraFuser> fuser =
       nvblox::datasets::cusfm_data::createFuser(
           FLAGS_color_image_dir, FLAGS_depth_image_dir, FLAGS_frames_meta_file,
-          true /* init from gflags */, FLAGS_fit_to_z0, output_dir);
+          true /* init from gflags */, FLAGS_fit_to_z0, output_dir,
+          FLAGS_exclude_mask_dir);
   if (!fuser) {
     LOG(FATAL) << "Creation of the Fuser failed";
   }

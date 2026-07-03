@@ -95,5 +95,29 @@ bool ImageLoader<ColorImage>::getImage(int image_idx, ColorImage* image_ptr) {
   return res;
 }
 
+bool load8BitMonoImage(const std::string& filename, MonoImage* mono_image_ptr) {
+  CHECK_NOTNULL(mono_image_ptr);
+  timing::Timer stbi_timer("file_loading/mono_image/stbi");
+  int width, height, num_channels;
+  uint8_t* image_data =
+      stbi_load(filename.c_str(), &width, &height, &num_channels, 1);
+  stbi_timer.Stop();
+
+  if (image_data == nullptr) {
+    return false;
+  }
+
+  mono_image_ptr->copyFrom(height, width, image_data);
+
+  stbi_image_free(image_data);
+  return true;
+}
+
+template <>
+bool ImageLoader<MonoImage>::getImage(int image_idx, MonoImage* image_ptr) {
+  CHECK_NOTNULL(image_ptr);
+  return load8BitMonoImage(index_to_filepath_(image_idx), image_ptr);
+}
+
 }  // namespace datasets
 }  // namespace nvblox

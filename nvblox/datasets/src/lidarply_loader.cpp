@@ -238,7 +238,8 @@ DataLoadResult DataLoader::loadNext(Pointcloud* pointcloud_ptr,
                                     Lidar* lidar_ptr, ColorImage*, Transform*,
                                     Camera*, Time* frame_timestamp_ms_ptr,
                                     Transform* T_L_S_scanEnd_ptr,
-                                    Time* scan_duration_ms_ptr) {
+                                    Time* scan_duration_ms_ptr, MonoImage*,
+                                    MonoImage*) {
   CHECK(setup_success_);
   CHECK_NOTNULL(pointcloud_ptr);
   CHECK_NOTNULL(T_L_S_scanStart_ptr);

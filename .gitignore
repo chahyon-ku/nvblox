@@ -2,6 +2,7 @@
 **/bazel-*/
 bazel-*
 MODULE.bazel.lock
+.bazelrc.local
 
 # Prerequisites
 *.d

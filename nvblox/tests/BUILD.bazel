@@ -146,10 +146,22 @@ cuda_test(
     ],
 )
 
+# These shard counts are intentionally per-target rather than uniform. Sharding
+# helps only when a test binary has enough independent gtest cases to offset the
+# extra process/GPU startup overhead. ESDF uses four shards because that reduced
+# the long tail without oversubscribing the GPU; occupancy and serialization have
+# fewer expensive cases, so three shards give a useful speedup.
+NVBLOX_CC_TEST_SHARD_COUNTS = {
+    "test_esdf_integrator": 4,
+    "test_occupancy_integrator": 3,
+    "test_serialization": 3,
+}
+
 # Non-cuda tests
 [
     cc_test(
         name = test_name,
+        shard_count = NVBLOX_CC_TEST_SHARD_COUNTS.get(test_name, 1),
         size = "{}".format(
             "enormous" if test_name in [
                 "test_esdf_integrator",

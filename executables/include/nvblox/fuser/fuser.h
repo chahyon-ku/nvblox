@@ -24,6 +24,7 @@ limitations under the License.
 #include "nvblox/datasets/3dmatch.h"
 #include "nvblox/datasets/cusfm_data.h"
 #include "nvblox/datasets/data_loader_interface.h"
+#include "nvblox/datasets/image_loader.h"
 #include "nvblox/datasets/lidarply_loader.h"
 #include "nvblox/datasets/redwood.h"
 #include "nvblox/datasets/replica.h"
@@ -149,6 +150,8 @@ class Fuser {
       std::make_shared<SensorDataType>(MemoryType::kDevice);
   std::shared_ptr<ColorImage> color_frame_ =
       std::make_shared<ColorImage>(MemoryType::kDevice);
+  MonoImage depth_mask_frame_{MemoryType::kDevice};
+  MonoImage color_mask_frame_{MemoryType::kDevice};
   std::shared_ptr<Time> frame_timestamp_ms_from_dataset_ =
       std::make_shared<Time>();
   std::shared_ptr<Transform> T_L_S_scanEnd_ = std::make_shared<Transform>();
@@ -183,12 +186,11 @@ std::unique_ptr<LidarFuser> createFuser(const std::string base_path,
                                         bool init_from_gflags = true);
 }  // namespace lidarply
 namespace cusfm_data {
-std::unique_ptr<CameraFuser> createFuser(const std::string& color_image_dir,
-                                         const std::string& depth_image_dir,
-                                         const std::string& frames_meta_file,
-                                         bool init_from_gflags,
-                                         bool fit_to_z_plane = false,
-                                         const std::string& output_dir = "");
+std::unique_ptr<CameraFuser> createFuser(
+    const std::string& color_image_dir, const std::string& depth_image_dir,
+    const std::string& frames_meta_file, bool init_from_gflags,
+    bool fit_to_z_plane = false, const std::string& output_dir = "",
+    const std::string& exclude_mask_dir = "");
 }  // namespace cusfm_data
 }  // namespace datasets
 

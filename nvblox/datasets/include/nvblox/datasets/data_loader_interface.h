@@ -55,6 +55,21 @@ class DataLoaderInterface {
   /// @return True if lidar scan data is available
   virtual bool provides_lidar_scan_data() const = 0;
 
+  /// Indicates whether this data loader provides a per-frame mask aligned
+  /// with the depth camera via the @p depth_mask_frame_ptr parameter of
+  /// loadNext().
+  virtual bool provides_depth_mask() const { return false; }
+
+  /// Indicates whether this data loader provides a per-frame mask aligned
+  /// with the color camera via the @p color_mask_frame_ptr parameter of
+  /// loadNext().
+  virtual bool provides_color_mask() const { return false; }
+
+  /// Semantics of the mask pixels produced by this loader. kNonInverted
+  /// means non-zero pixels are kept and zero pixels are ignored; kInverted
+  /// means the opposite. Applies to both the depth and color masks.
+  virtual MaskMode mask_mode() const { return MaskMode::kNonInverted; }
+
   /// Interface for a function that loads the next frames in a dataset.
   ///@param[out] sensor_data_ptr The loaded sensor data (DepthImage or
   /// Pointcloud).
@@ -72,17 +87,24 @@ class DataLoaderInterface {
   /// provides_lidar_scan_data() is true).
   ///@param[out] scan_duration_ms_ptr Optional lidar scan duration (if
   /// provides_lidar_scan_data() is true).
+  ///@param[out] depth_mask_frame_ptr Optional mask aligned with the depth
+  /// camera (if provides_mask() is true).
+  ///@param[out] color_mask_frame_ptr Optional mask aligned with the color
+  /// camera (if provides_mask() is true). May point at the same MonoImage as
+  /// @p depth_mask_frame_ptr when depth and color share a camera.
   ///@return Whether loading succeeded.
   virtual DataLoadResult loadNext(
-      SensorDataType* sensor_data_ptr,            // NOLINT
-      Transform* T_L_S_ptr,                       // NOLINT
-      SensorType* sensor_ptr,                     // NOLINT
-      ColorImage* color_frame_ptr = nullptr,      // NOLINT
-      Transform* T_L_C_ptr = nullptr,             // NOLINT
-      Camera* color_sensor_ptr = nullptr,         // NOLINT
-      Time* frame_timestamp_ms_ptr = nullptr,     // NOLINT
-      Transform* T_L_S_scanEnd_ptr = nullptr,     // NOLINT
-      Time* scan_duration_ms_ptr = nullptr) = 0;  // NOLINT
+      SensorDataType* sensor_data_ptr,                 // NOLINT
+      Transform* T_L_S_ptr,                            // NOLINT
+      SensorType* sensor_ptr,                          // NOLINT
+      ColorImage* color_frame_ptr = nullptr,           // NOLINT
+      Transform* T_L_C_ptr = nullptr,                  // NOLINT
+      Camera* color_sensor_ptr = nullptr,              // NOLINT
+      Time* frame_timestamp_ms_ptr = nullptr,          // NOLINT
+      Transform* T_L_S_scanEnd_ptr = nullptr,          // NOLINT
+      Time* scan_duration_ms_ptr = nullptr,            // NOLINT
+      MonoImage* depth_mask_frame_ptr = nullptr,       // NOLINT
+      MonoImage* color_mask_frame_ptr = nullptr) = 0;  // NOLINT
 
  protected:
   // Indicates if the dataset loader was constructed in a state that was good to

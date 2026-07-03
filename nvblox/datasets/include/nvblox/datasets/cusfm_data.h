@@ -57,7 +57,8 @@ class DataLoader : public RgbdDataLoaderInterface {
              const std::vector<KeyframeMetadata>& keyframe_metadatas,
              const std::unordered_map<uint32_t, Camera>& cameras,
              bool multithreaded = true, bool fit_to_z_plane = false,
-             const std::string& output_dir = "");
+             const std::string& output_dir = "",
+             const std::string& exclude_mask_dir = "");
   virtual ~DataLoader() = default;
 
   /// Builds a DatasetLoader
@@ -67,26 +68,47 @@ class DataLoader : public RgbdDataLoaderInterface {
   /// @param multithreaded Whether or not to multi-thread image loading
   /// @param fit_to_z_plane Whether to fit all poses to z=0 plane
   /// @param output_dir Output directory for saving transform JSON
+  /// @param exclude_mask_dir Optional path to a directory of binary mask PNGs
+  /// that mirrors the layout of color_image_dir (including any per-camera
+  /// subdirectory) with the file extension swapped to .png. When non-empty,
+  /// provides_mask() is true and loadNext() fills mask_frame_ptr when passed.
   /// @return std::unique_ptr<DataLoader> The dataset loader. May be nullptr if
   /// construction fails.
   static std::unique_ptr<DataLoader> create(
       const std::string& color_image_dir, const std::string& depth_image_dir,
       const std::string& keyframe_metadata_file, bool multithreaded = true,
-      bool fit_to_z_plane = false, const std::string& output_dir = "");
+      bool fit_to_z_plane = false, const std::string& output_dir = "",
+      const std::string& exclude_mask_dir = "");
 
   /// CUSFM datasets do not provide frame timestamps
   bool provides_frame_timestamps() const override { return false; }
+
+  /// cusfm uses a single camera for both depth and color, so the same mask
+  /// is exposed through both the depth-mask and color-mask channels when an
+  /// exclude_mask_dir was provided at construction.
+  bool provides_depth_mask() const override {
+    return mask_image_loader_ != nullptr;
+  }
+  bool provides_color_mask() const override {
+    return mask_image_loader_ != nullptr;
+  }
+
+  /// cusfm masks flag pixels to exclude (non-zero = exclude).
+  MaskMode mask_mode() const override { return MaskMode::kInverted; }
 
   /// Interface for a function that loads the next frames in a dataset
   /// @param[out] depth_frame_ptr The loaded depth frame.
   /// @param[out] T_L_C_ptr Transform from Camera to the Layer frame.
   /// @param[out] camera_ptr The intrinsic camera model.
   /// @param[out] color_frame_ptr Optional, load color frame.
+  /// @param[out] mask_frame_ptr Optional binary mask aligned with the
+  /// color and depth.
   /// @return Whether loading succeeded.
-  DataLoadResult loadNext(DepthImage* depth_frame_ptr,  // NOLINT
-                          Transform* T_L_C_ptr,         // NOLINT
-                          Camera* camera_ptr,           // NOLINT
-                          ColorImage* color_frame_ptr = nullptr);
+  DataLoadResult loadNext(DepthImage* depth_frame_ptr,            // NOLINT
+                          Transform* T_L_C_ptr,                   // NOLINT
+                          Camera* camera_ptr,                     // NOLINT
+                          ColorImage* color_frame_ptr = nullptr,  // NOLINT
+                          MonoImage* mask_frame_ptr = nullptr);
 
   /// Interface for a function that loads the next frames in a dataset.
   /// This is the version of the function for different depth and color cameras.
@@ -99,16 +121,23 @@ class DataLoader : public RgbdDataLoaderInterface {
   /// @param[out] unused Needed to match data loader interface (pass nullptr).
   /// @param[out] unused Needed to match data loader interface (pass nullptr).
   /// @param[out] unused Needed to match data loader interface (pass nullptr).
+  /// @param[out] depth_mask_frame_ptr Optional mask aligned with the depth
+  /// camera.
+  /// @param[out] color_mask_frame_ptr Optional mask aligned with the color
+  /// camera.
   /// @return Whether loading succeeded.
-  DataLoadResult loadNext(DepthImage* depth_frame_ptr,  // NOLINT
-                          Transform* T_L_D_ptr,         // NOLINT
-                          Camera* depth_camera_ptr,     // NOLINT
-                          ColorImage* color_frame_ptr,  // NOLINT
-                          Transform* T_L_C_ptr,         // NOLINT
-                          Camera* color_camera_ptr,     // NOLINT
-                          Time*,                        // NOLINT
-                          Transform*,                   // NOLINT
-                          Time*) override;              // NOLINT
+  DataLoadResult loadNext(DepthImage* depth_frame_ptr,      // NOLINT
+                          Transform* T_L_D_ptr,             // NOLINT
+                          Camera* depth_camera_ptr,         // NOLINT
+                          ColorImage* color_frame_ptr,      // NOLINT
+                          Transform* T_L_C_ptr,             // NOLINT
+                          Camera* color_camera_ptr,         // NOLINT
+                          Time*,                            // NOLINT
+                          Transform*,                       // NOLINT
+                          Time*,                            // NOLINT
+                          MonoImage* depth_mask_frame_ptr,  // NOLINT
+                          MonoImage* color_mask_frame_ptr)  // NOLINT
+      override;
 
  protected:
   // Mapping data directory
@@ -125,6 +154,8 @@ class DataLoader : public RgbdDataLoaderInterface {
 
   std::unique_ptr<ImageLoader<DepthImage>> depth_image_loader_;
   std::unique_ptr<ImageLoader<ColorImage>> color_image_loader_;
+  // Optional; non-null only when an exclude_mask_dir was provided to create().
+  std::unique_ptr<ImageLoader<MonoImage>> mask_image_loader_;
 
  private:
   // Z-plane alignment functionality

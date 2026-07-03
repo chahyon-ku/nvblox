@@ -37,6 +37,7 @@ limitations under the License.
 #include "nvblox/map/layer.h"
 #include "nvblox/map/layer_cake.h"
 #include "nvblox/map/voxels.h"
+#include "nvblox/mapper/mapper_integrators.h"
 #include "nvblox/mapper/mapper_params.h"
 #include "nvblox/mesh/flat_mesh_integrator.h"
 #include "nvblox/mesh/mesh_integrator.h"
@@ -490,10 +491,17 @@ class Mapper : public MapperBase {
   LayerCakeStreamer& layer_streamers() { return layer_streamers_; }
 
   /// Getter
+  /// @return const MapperIntegrators& The mapper integrator bundle.
+  const MapperIntegrators& integrators() const { return integrators_; }
+  /// Getter
+  /// @return MapperIntegrators& The mapper integrator bundle.
+  MapperIntegrators& integrators() { return integrators_; }
+
+  /// Getter
   ///@return const ProjectiveTsdfIntegrator& TSDF integrator used for
   ///        depth/rgbd frame integration.
   const ProjectiveTsdfIntegrator& tsdf_integrator() const {
-    return tsdf_integrator_;
+    return integrators_.tsdf_integrator;
   }
 
   /// Get the appropriate TSDF integrator based on sensor type
@@ -501,17 +509,13 @@ class Mapper : public MapperBase {
   /// @return const ProjectiveTsdfIntegrator& The appropriate TSDF integrator
   template <typename SensorType>
   const ProjectiveTsdfIntegrator& getTsdfIntegrator() const {
-    if constexpr (SensorType::sensor_modality() == SensorModality::kLidar) {
-      return lidar_tsdf_integrator_;
-    } else {
-      return tsdf_integrator_;
-    }
+    return integrators_.getTsdfIntegrator<SensorType>();
   }
   /// Getter
   ///@return const ProjectiveOccupancyIntegrator& occupancy integrator used
   /// for depth/rgbd frame integration.
   const ProjectiveOccupancyIntegrator& occupancy_integrator() const {
-    return occupancy_integrator_;
+    return integrators_.occupancy_integrator;
   }
 
   /// Get the appropriate occupancy integrator based on sensor type
@@ -520,77 +524,73 @@ class Mapper : public MapperBase {
   /// integrator
   template <typename SensorType>
   const ProjectiveOccupancyIntegrator& getOccupancyIntegrator() const {
-    if constexpr (SensorType::sensor_modality() == SensorModality::kLidar) {
-      return lidar_occupancy_integrator_;
-    } else {
-      return occupancy_integrator_;
-    }
+    return integrators_.getOccupancyIntegrator<SensorType>();
   }
   /// Getter
   ///@return const FreespaceIntegrator& freespace integrator used for
   ///        updating the freespace layer according to a tsdf layer.
   const FreespaceIntegrator& freespace_integrator() const {
-    return freespace_integrator_;
+    return integrators_.freespace_integrator;
   }
   /// Getter
   ///@return const ProjectiveTsdfIntegrator& TSDF integrator used for
   ///        3D LiDAR scan integration.
   const ProjectiveTsdfIntegrator& lidar_tsdf_integrator() const {
-    return lidar_tsdf_integrator_;
+    return integrators_.lidar_tsdf_integrator;
   }
   /// Getter
   ///@return const ProjectiveOccupancyIntegrator& occupancy integrator used
   /// for 3D LiDAR scan integration.
   const ProjectiveOccupancyIntegrator& lidar_occupancy_integrator() const {
-    return lidar_occupancy_integrator_;
+    return integrators_.lidar_occupancy_integrator;
   }
   /// Getter
   ///@return const OccupancyDecayIntegrator& occupancy integrator used fior
   ///        decaying an occupancy layer towards 0.5 occupancy probability.
   const OccupancyDecayIntegrator& occupancy_decay_integrator() const {
-    return occupancy_decay_integrator_;
+    return integrators_.occupancy_decay_integrator;
   }
   /// Getter
   ///@return const TsdfDecayIntegrator& tsdf integrator used for
   ///        decaying an tsdf layer
   const TsdfDecayIntegrator& tsdf_decay_integrator() const {
-    return tsdf_decay_integrator_;
+    return integrators_.tsdf_decay_integrator;
   }
   /// Getter
   ///@return const TsdfShapeClearer& TSDF clearer used for
   ///        clearing tsdf inside given shapes.
   const TsdfShapeClearer& tsdf_shape_clearer() const {
-    return tsdf_shape_clearer_;
+    return integrators_.tsdf_shape_clearer;
   }
   /// Getter
   ///@return const ProjectiveColorIntegrator& Color integrator.
   const ProjectiveColorIntegrator& color_integrator() const {
-    return color_integrator_;
+    return integrators_.color_integrator;
   }
   /// Getter
   ///@return const ProjectiveFeatureIntegrator& Feature integrator.
   const ProjectiveFeatureIntegrator& feature_integrator() const {
-    return feature_integrator_;
+    return integrators_.feature_integrator;
   }
   /// Getter
   ///@return const MeshIntegrator& Mesh integrator
   const ColorMeshIntegrator& color_mesh_integrator() const {
-    return color_mesh_integrator_;
+    return integrators_.color_mesh_integrator;
   }
   /// Getter
   ///@return const MeshIntegrator& Mesh integrator
   const FeatureMeshIntegrator& feature_mesh_integrator() const {
-    return feature_mesh_integrator_;
+    return integrators_.feature_mesh_integrator;
   }
   /// Getter
   ///@return const ColorFlatMeshIntegrator& Flat color mesh integrator
   const ColorFlatMeshIntegrator& color_flat_mesh_integrator() const {
-    return color_flat_mesh_integrator_;
+    return integrators_.color_flat_mesh_integrator;
   }
   /// Getter
   ///@return const FeatureFlatMeshIntegrator& Flat feature mesh integrator
   const FeatureFlatMeshIntegrator& feature_flat_mesh_integrator() const {
-    return feature_flat_mesh_integrator_;
+    return integrators_.feature_flat_mesh_integrator;
   }
   /// Getter
   ///@return const ColorMesh& Flat color mesh output
@@ -600,29 +600,29 @@ class Mapper : public MapperBase {
   const FeatureMesh& flat_feature_mesh() const { return flat_feature_mesh_; }
   /// Getter
   ///@return const EsdfIntegrator& ESDF integrator
-  const EsdfIntegrator& esdf_integrator() const { return esdf_integrator_; }
+  const EsdfIntegrator& esdf_integrator() const {
+    return integrators_.esdf_integrator;
+  }
 
   /// Getter
   ///@return ProjectiveTsdfIntegrator& TSDF integrator used for
   ///        depth/rgbd frame integration.
-  ProjectiveTsdfIntegrator& tsdf_integrator() { return tsdf_integrator_; }
+  ProjectiveTsdfIntegrator& tsdf_integrator() {
+    return integrators_.tsdf_integrator;
+  }
 
   /// Get the appropriate TSDF integrator based on sensor type
   /// @tparam SensorType The sensor type
   /// @return ProjectiveTsdfIntegrator& The appropriate TSDF integrator
   template <typename SensorType>
   ProjectiveTsdfIntegrator& getTsdfIntegrator() {
-    if constexpr (SensorType::sensor_modality() == SensorModality::kLidar) {
-      return lidar_tsdf_integrator_;
-    } else {
-      return tsdf_integrator_;
-    }
+    return integrators_.getTsdfIntegrator<SensorType>();
   }
   /// Getter
   ///@return ProjectiveOccupancyIntegrator& occupancy integrator used for
   ///        depth/rgbd frame integration.
   ProjectiveOccupancyIntegrator& occupancy_integrator() {
-    return occupancy_integrator_;
+    return integrators_.occupancy_integrator;
   }
 
   /// Get the appropriate occupancy integrator based on sensor type
@@ -631,76 +631,78 @@ class Mapper : public MapperBase {
   /// integrator
   template <typename SensorType>
   ProjectiveOccupancyIntegrator& getOccupancyIntegrator() {
-    if constexpr (SensorType::sensor_modality() == SensorModality::kLidar) {
-      return lidar_occupancy_integrator_;
-    } else {
-      return occupancy_integrator_;
-    }
+    return integrators_.getOccupancyIntegrator<SensorType>();
   }
   /// Getter
   ///@return FreespaceIntegrator& freespace integrator used for
   ///        updating the freespace layer according to a tsdf layer.
-  FreespaceIntegrator& freespace_integrator() { return freespace_integrator_; }
+  FreespaceIntegrator& freespace_integrator() {
+    return integrators_.freespace_integrator;
+  }
   /// Getter
   ///@return ProjectiveTsdfIntegrator& TSDF integrator used for
   ///        3D LiDAR scan integration.
   ProjectiveTsdfIntegrator& lidar_tsdf_integrator() {
-    return lidar_tsdf_integrator_;
+    return integrators_.lidar_tsdf_integrator;
   }
   /// Getter
   ///@return ProjectiveOccupancyIntegrator& occupancy integrator used for
   ///        3D LiDAR scan integration.
   ProjectiveOccupancyIntegrator& lidar_occupancy_integrator() {
-    return lidar_occupancy_integrator_;
+    return integrators_.lidar_occupancy_integrator;
   }
   /// Getter
   ///@return OccupancyDecayIntegrator& occupancy decay integrator used for
   ///        decaying an occupancy layer towards 0.5 occupancy probability.
   OccupancyDecayIntegrator& occupancy_decay_integrator() {
-    return occupancy_decay_integrator_;
+    return integrators_.occupancy_decay_integrator;
   }
   /// Getter
   ///@return TsdfDecayIntegrator& TSDF decay integrator used for decaying a
   /// TSDF
   ///        layer (through reduction of voxel weights).
   TsdfDecayIntegrator& tsdf_decay_integrator() {
-    return tsdf_decay_integrator_;
+    return integrators_.tsdf_decay_integrator;
   }
   /// Getter
   ///@return TsdfShapeClearer& TSDF clearer used for
   ///        clearing tsdf inside given shapes.
-  TsdfShapeClearer& tsdf_shape_clearer() { return tsdf_shape_clearer_; }
+  TsdfShapeClearer& tsdf_shape_clearer() {
+    return integrators_.tsdf_shape_clearer;
+  }
   /// Getter
   ///@return ProjectiveColorIntegrator& Color integrator.
-  ProjectiveColorIntegrator& color_integrator() { return color_integrator_; }
+  ProjectiveColorIntegrator& color_integrator() {
+    return integrators_.color_integrator;
+  }
   /// Getter
   ///@return ProjectiveFeatureIntegrator& Feature integrator.
   ProjectiveFeatureIntegrator& feature_integrator() {
-    return feature_integrator_;
+    return integrators_.feature_integrator;
   }
   /// Getter
   ///@return MeshIntegrator& Mesh integrator
   ColorMeshIntegrator& color_mesh_integrator() {
-    return color_mesh_integrator_;
+    return integrators_.color_mesh_integrator;
   }
   /// Getter
   ///@return MeshIntegrator& Mesh integrator
   FeatureMeshIntegrator& feature_mesh_integrator() {
-    return feature_mesh_integrator_;
+    return integrators_.feature_mesh_integrator;
   }
   /// Getter
   ///@return ColorFlatMeshIntegrator& Flat color mesh integrator
   ColorFlatMeshIntegrator& color_flat_mesh_integrator() {
-    return color_flat_mesh_integrator_;
+    return integrators_.color_flat_mesh_integrator;
   }
   /// Getter
   ///@return FeatureFlatMeshIntegrator& Flat feature mesh integrator
   FeatureFlatMeshIntegrator& feature_flat_mesh_integrator() {
-    return feature_flat_mesh_integrator_;
+    return integrators_.feature_flat_mesh_integrator;
   }
   /// Getter
   ///@return EsdfIntegrator& ESDF integrator
-  EsdfIntegrator& esdf_integrator() { return esdf_integrator_; }
+  EsdfIntegrator& esdf_integrator() { return integrators_.esdf_integrator; }
   /// Getter
   /// @return The voxel size in meters
   float voxel_size_m() const { return voxel_size_m_; };
@@ -896,22 +898,8 @@ class Mapper : public MapperBase {
   /// in.
   EsdfMode esdf_mode_ = EsdfMode::kUnset;
 
-  /// Integrators
-  ProjectiveTsdfIntegrator tsdf_integrator_;
-  ProjectiveTsdfIntegrator lidar_tsdf_integrator_;
-  FreespaceIntegrator freespace_integrator_;
-  ProjectiveOccupancyIntegrator occupancy_integrator_;
-  ProjectiveOccupancyIntegrator lidar_occupancy_integrator_;
-  OccupancyDecayIntegrator occupancy_decay_integrator_;
-  TsdfDecayIntegrator tsdf_decay_integrator_;
-  TsdfShapeClearer tsdf_shape_clearer_;
-  ProjectiveColorIntegrator color_integrator_;
-  ProjectiveFeatureIntegrator feature_integrator_;
-  ColorMeshIntegrator color_mesh_integrator_;
-  FeatureMeshIntegrator feature_mesh_integrator_;
-  ColorFlatMeshIntegrator color_flat_mesh_integrator_;
-  FeatureFlatMeshIntegrator feature_flat_mesh_integrator_;
-  EsdfIntegrator esdf_integrator_;
+  /// Integrators used by the mapper.
+  MapperIntegrators integrators_;
 
   // Layer Streamers
   LayerCakeStreamer layer_streamers_;

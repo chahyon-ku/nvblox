@@ -271,7 +271,7 @@ DataLoadResult DataLoader::loadNext(DepthImage* depth_frame_ptr,
 DataLoadResult DataLoader::loadNext(
     DepthImage* depth_frame_ptr, Transform* T_L_D_ptr, Camera* depth_camera_ptr,
     ColorImage* color_frame_ptr, Transform* T_L_C_ptr, Camera* color_camera_ptr,
-    Time*, Transform*, Time*) {
+    Time*, Transform*, Time*, MonoImage*, MonoImage*) {
   // NOTE: The other pointers are checked non-null below
   CHECK_NOTNULL(color_frame_ptr);
   CHECK_NOTNULL(T_L_C_ptr);

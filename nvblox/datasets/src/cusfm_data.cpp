@@ -384,6 +384,22 @@ std::string getPathForColorImage(
   return path;
 }
 
+std::string getPathForMaskImage(
+    const std::string& base_path,
+    const std::vector<nvblox::datasets::cusfm_data::KeyframeMetadata>&
+        keyframe_metadatas,
+    const int frame_id) {
+  // Mirror the color_image_path layout (incl. camera subdir) under base_path,
+  // swapping the extension to .png.
+  std::filesystem::path color_path(
+      keyframe_metadatas[frame_id].color_image_path);
+  std::filesystem::path mask_rel =
+      color_path.parent_path() / (color_path.stem().string() + ".png");
+  std::string path = base_path + "/" + mask_rel.string();
+  VLOG(1) << "Load mask image from " << path;
+  return path;
+}
+
 std::string getPathForDepthImage(
     const std::string& base_path,
     const std::vector<nvblox::datasets::cusfm_data::KeyframeMetadata>&
@@ -506,6 +522,17 @@ createColorImageLoader(
       std::bind(getPathForColorImage, image_dir, keyframe_metadatas,
                 std::placeholders::_1),
       multithreaded);
+}
+
+std::unique_ptr<nvblox::datasets::ImageLoader<nvblox::MonoImage>>
+createMaskImageLoader(
+    const std::string& exclude_mask_dir,
+    const std::vector<nvblox::datasets::cusfm_data::KeyframeMetadata>&
+        keyframe_metadatas) {
+  return nvblox::datasets::createImageLoader<nvblox::MonoImage>(
+      std::bind(getPathForMaskImage, exclude_mask_dir, keyframe_metadatas,
+                std::placeholders::_1),
+      false /* multithreaded */);
 }
 
 bool loadKeyframeMetadataCollection(
@@ -634,10 +661,14 @@ namespace cusfm_data {
 std::unique_ptr<DataLoader> DataLoader::create(
     const std::string& color_image_dir, const std::string& depth_image_dir,
     const std::string& frames_meta_file, bool multithreaded,
-    bool fit_to_z_plane, const std::string& output_dir) {
+    bool fit_to_z_plane, const std::string& output_dir,
+    const std::string& exclude_mask_dir) {
   LOG(INFO) << "Load color images from " << color_image_dir;
   LOG(INFO) << "Load depth images from " << depth_image_dir;
   LOG(INFO) << "Load frames_meta from " << frames_meta_file;
+  if (!exclude_mask_dir.empty()) {
+    LOG(INFO) << "Load mask images from " << exclude_mask_dir;
+  }
 
   // Construct a dataset loader but only return it if everything worked.
   std::vector<KeyframeMetadata> keyframe_metadatas;
@@ -647,7 +678,7 @@ std::unique_ptr<DataLoader> DataLoader::create(
                                  &cameras);
   auto dataset_loader = std::make_unique<DataLoader>(
       color_image_dir, depth_image_dir, keyframe_metadatas, cameras,
-      multithreaded, fit_to_z_plane, output_dir);
+      multithreaded, fit_to_z_plane, output_dir, exclude_mask_dir);
   if (dataset_loader->setup_success_) {
     return dataset_loader;
   } else {
@@ -703,7 +734,8 @@ DataLoader::DataLoader(const std::string& color_image_dir,
                        const std::vector<KeyframeMetadata>& keyframe_metadatas,
                        const std::unordered_map<uint32_t, Camera>& cameras,
                        bool multithreaded, bool fit_to_z_plane,
-                       const std::string& output_dir)
+                       const std::string& output_dir,
+                       const std::string& exclude_mask_dir)
     : RgbdDataLoaderInterface(),
       keyframe_metadatas_(keyframe_metadatas),
       cameras_(cameras),
@@ -711,6 +743,10 @@ DataLoader::DataLoader(const std::string& color_image_dir,
           depth_image_dir, keyframe_metadatas, multithreaded)),
       color_image_loader_(createColorImageLoader(
           color_image_dir, keyframe_metadatas, multithreaded)),
+      mask_image_loader_(
+          exclude_mask_dir.empty()
+              ? nullptr
+              : ::createMaskImageLoader(exclude_mask_dir, keyframe_metadatas)),
       fit_to_z_plane_(fit_to_z_plane),
       output_dir_(output_dir),
       T_world_to_z0_plane_(Transform::Identity()),
@@ -723,7 +759,8 @@ DataLoader::DataLoader(const std::string& color_image_dir,
 
 DataLoadResult DataLoader::loadNext(DepthImage* depth_frame_ptr,
                                     Transform* T_L_C_ptr, Camera* camera_ptr,
-                                    ColorImage* color_frame_ptr) {
+                                    ColorImage* color_frame_ptr,
+                                    MonoImage* mask_frame_ptr) {
   CHECK(setup_success_);
   CHECK_NOTNULL(depth_frame_ptr);
   CHECK_NOTNULL(T_L_C_ptr);
@@ -756,6 +793,15 @@ DataLoadResult DataLoader::loadNext(DepthImage* depth_frame_ptr,
       return DataLoadResult::kBadFrame;
     }
     timer_file_color.Stop();
+  }
+
+  if (mask_image_loader_) {
+    timing::Timer timer_file_mask("file_loading/mask_image");
+    if (!mask_image_loader_->getNextImage(mask_frame_ptr)) {
+      LOG(INFO) << "Couldn't find mask image";
+      return DataLoadResult::kBadFrame;
+    }
+    timer_file_mask.Stop();
   }
 
   int32_t current_frame_id = frame_number_ - 1;
@@ -808,15 +854,18 @@ DataLoadResult DataLoader::loadNext(DepthImage* depth_frame_ptr,
 DataLoadResult DataLoader::loadNext(
     DepthImage* depth_frame_ptr, Transform* T_L_D_ptr, Camera* depth_camera_ptr,
     ColorImage* color_frame_ptr, Transform* T_L_C_ptr, Camera* color_camera_ptr,
-    Time*, Transform*, Time*) {
+    Time*, Transform*, Time*, MonoImage* depth_mask_frame_ptr,
+    MonoImage* color_mask_frame_ptr) {
   // NOTE: The other pointers are checked non-null below
   CHECK_NOTNULL(color_frame_ptr);
   CHECK_NOTNULL(T_L_C_ptr);
   CHECK_NOTNULL(color_camera_ptr);
-  // For the replica dataset the depth and color cameras are the same, so just
-  // copying over.
-  auto result =
-      loadNext(depth_frame_ptr, T_L_D_ptr, depth_camera_ptr, color_frame_ptr);
+  // cusfm has a single camera, so one mask covers both depth and color.
+  auto result = loadNext(depth_frame_ptr, T_L_D_ptr, depth_camera_ptr,
+                         color_frame_ptr, depth_mask_frame_ptr);
+  if (result == DataLoadResult::kSuccess && mask_image_loader_) {
+    color_mask_frame_ptr->copyFrom(*depth_mask_frame_ptr);
+  }
   *T_L_C_ptr = *T_L_D_ptr;
   *color_camera_ptr = *depth_camera_ptr;
   return result;
