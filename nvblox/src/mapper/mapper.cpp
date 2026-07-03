@@ -20,7 +20,6 @@ limitations under the License.
 #include "nvblox/io/layer_cake_io.h"
 #include "nvblox/io/mesh_io.h"
 #include "nvblox/io/pointcloud_io.h"
-#include "nvblox/mapper/internal/mapper_common.h"
 #include "nvblox/utils/rates.h"
 
 namespace nvblox {
@@ -32,19 +31,7 @@ Mapper::Mapper(float voxel_size_m,
     : cuda_stream_(cuda_stream),
       voxel_size_m_(voxel_size_m),
       projective_layer_type_(projective_layer_type),
-      tsdf_integrator_(cuda_stream),
-      lidar_tsdf_integrator_(cuda_stream),
-      freespace_integrator_(cuda_stream),
-      occupancy_integrator_(cuda_stream),
-      lidar_occupancy_integrator_(cuda_stream),
-      tsdf_shape_clearer_(cuda_stream),
-      color_integrator_(cuda_stream),
-      feature_integrator_(cuda_stream),
-      color_mesh_integrator_(cuda_stream),
-      feature_mesh_integrator_(cuda_stream),
-      color_flat_mesh_integrator_(cuda_stream),
-      feature_flat_mesh_integrator_(cuda_stream),
-      esdf_integrator_(cuda_stream),
+      integrators_(cuda_stream),
       depth_preprocessor_(cuda_stream) {
   layers_ = LayerCake::create<TsdfLayer, ColorLayer, FeatureLayer,
                               FreespaceLayer, OccupancyLayer, EsdfLayer,
@@ -54,30 +41,14 @@ Mapper::Mapper(float voxel_size_m,
       LayerCakeStreamer::create<TsdfLayer, ColorLayer, FeatureLayer,
                                 FreespaceLayer, OccupancyLayer, EsdfLayer,
                                 ColorMeshLayer, FeatureMeshLayer>();
-  // Make the camera integrators share the same viewpoint cache.
-  shareViewpointCaches(&tsdf_integrator_, &occupancy_integrator_,
-                       &color_integrator_, &feature_integrator_);
-  // Make the LiDAR integrators share the same viewpoint cache
-  shareViewpointCaches(&lidar_tsdf_integrator_, &lidar_occupancy_integrator_);
 }
 
 Mapper::Mapper(const std::string& map_filepath,
                BlockMemoryPoolParams block_memory_pool_params,
                std::shared_ptr<CudaStream> cuda_stream)
     : cuda_stream_(cuda_stream),
-      tsdf_integrator_(cuda_stream),
-      lidar_tsdf_integrator_(cuda_stream),
-      freespace_integrator_(cuda_stream),
-      occupancy_integrator_(cuda_stream),
-      lidar_occupancy_integrator_(cuda_stream),
-      tsdf_shape_clearer_(cuda_stream),
-      color_integrator_(cuda_stream),
-      feature_integrator_(cuda_stream),
-      color_mesh_integrator_(cuda_stream),
-      feature_mesh_integrator_(cuda_stream),
-      color_flat_mesh_integrator_(cuda_stream),
-      feature_flat_mesh_integrator_(cuda_stream),
-      esdf_integrator_(cuda_stream),
+      integrators_(cuda_stream,
+                   MapperIntegrators::ViewpointCacheSharing::kDisabled),
       depth_preprocessor_(cuda_stream) {
   loadMap(map_filepath, block_memory_pool_params);
 }
@@ -87,222 +58,7 @@ void Mapper::setMapperParams(const MapperParams& params) {
   // depth preprocessing
   do_depth_preprocessing(params.do_depth_preprocessing);
   depth_preprocessing_num_dilations(params.depth_preprocessing_num_dilations);
-
-  // ======= ESDF INTEGRATOR =======
-  esdf_integrator().esdf_slice_min_height(
-      params.esdf_integrator_params.esdf_slice_min_height);
-  esdf_integrator().esdf_slice_max_height(
-      params.esdf_integrator_params.esdf_slice_max_height);
-  esdf_integrator().esdf_slice_height(
-      params.esdf_integrator_params.esdf_slice_height);
-  esdf_integrator().slice_height_above_plane_m(
-      params.esdf_integrator_params.slice_height_above_plane_m);
-  esdf_integrator().slice_height_thickness_m(
-      params.esdf_integrator_params.slice_height_thickness_m);
-  esdf_integrator().max_esdf_distance_m(
-      params.esdf_integrator_params.esdf_integrator_max_distance_m);
-  esdf_integrator().min_weight(
-      params.esdf_integrator_params.esdf_integrator_min_weight);
-  esdf_integrator().max_site_distance_vox(
-      params.esdf_integrator_params.esdf_integrator_max_site_distance_vox);
-  esdf_integrator().unobserved_esdf_policy(
-      params.esdf_integrator_params.unobserved_esdf_policy);
-  esdf_integrator().add_negative_truncation_band_sites(
-      params.esdf_integrator_params.add_negative_truncation_band_sites);
-  esdf_integrator().truncation_distance_vox(
-      params.projective_integrator_params
-          .projective_integrator_truncation_distance_vox);
-
-  // ======= PROJECTIVE INTEGRATOR (TSDF/COLOR/OCCUPANCY)
-  // max integration distance
-  tsdf_integrator().max_integration_distance_m(
-      params.projective_integrator_params
-          .projective_integrator_max_integration_distance_m);
-  occupancy_integrator().max_integration_distance_m(
-      params.projective_integrator_params
-          .projective_integrator_max_integration_distance_m);
-  color_integrator().max_integration_distance_m(
-      params.projective_integrator_params
-          .projective_integrator_max_integration_distance_m);
-  feature_integrator().max_integration_distance_m(
-      params.projective_integrator_params
-          .projective_integrator_max_integration_distance_m);
-  lidar_tsdf_integrator().max_integration_distance_m(
-      params.projective_integrator_params
-          .lidar_projective_integrator_max_integration_distance_m);
-  lidar_occupancy_integrator().max_integration_distance_m(
-      params.projective_integrator_params
-          .lidar_projective_integrator_max_integration_distance_m);
-  // truncation distance
-  tsdf_integrator().truncation_distance_vox(
-      params.projective_integrator_params
-          .projective_integrator_truncation_distance_vox);
-  occupancy_integrator().truncation_distance_vox(
-      params.projective_integrator_params
-          .projective_integrator_truncation_distance_vox);
-  lidar_tsdf_integrator().truncation_distance_vox(
-      params.projective_integrator_params
-          .projective_integrator_truncation_distance_vox);
-  lidar_occupancy_integrator().truncation_distance_vox(
-      params.projective_integrator_params
-          .projective_integrator_truncation_distance_vox);
-  // weighting
-  tsdf_integrator().weighting_function_type(
-      params.projective_integrator_params.projective_integrator_weighting_mode);
-  color_integrator().weighting_function_type(
-      params.projective_integrator_params.projective_integrator_weighting_mode);
-  feature_integrator().weighting_function_type(
-      params.projective_integrator_params.projective_integrator_weighting_mode);
-  lidar_tsdf_integrator().weighting_function_type(
-      params.projective_integrator_params.projective_integrator_weighting_mode);
-  // max weight
-  tsdf_integrator().max_weight(
-      params.projective_integrator_params.projective_integrator_max_weight);
-  lidar_tsdf_integrator().max_weight(
-      params.projective_integrator_params.projective_integrator_max_weight);
-  color_integrator().max_weight(
-      params.projective_integrator_params.projective_integrator_max_weight);
-  feature_integrator().max_weight(
-      params.projective_integrator_params.projective_integrator_max_weight);
-  // Measurement weight for appearance integrators
-  color_integrator().measurement_weight(
-      params.projective_integrator_params
-          .projective_appearance_integrator_measurement_weight);
-  feature_integrator().measurement_weight(
-      params.projective_integrator_params
-          .projective_appearance_integrator_measurement_weight);
-  // invalid depth decay
-  tsdf_integrator().invalid_depth_decay_factor(
-      params.projective_integrator_params
-          .projective_tsdf_integrator_invalid_depth_decay_factor);
-  lidar_tsdf_integrator().invalid_depth_decay_factor(
-      params.projective_integrator_params
-          .projective_tsdf_integrator_invalid_depth_decay_factor);
-
-  // ======= OCCUPANCY INTEGRATOR =======
-  occupancy_integrator().free_region_occupancy_probability(
-      params.occupancy_integrator_params.free_region_occupancy_probability);
-  lidar_occupancy_integrator().free_region_occupancy_probability(
-      params.occupancy_integrator_params.free_region_occupancy_probability);
-  occupancy_integrator().occupied_region_occupancy_probability(
-      params.occupancy_integrator_params.occupied_region_occupancy_probability);
-  lidar_occupancy_integrator().occupied_region_occupancy_probability(
-      params.occupancy_integrator_params.occupied_region_occupancy_probability);
-  occupancy_integrator().unobserved_region_occupancy_probability(
-      params.occupancy_integrator_params
-          .unobserved_region_occupancy_probability);
-  lidar_occupancy_integrator().unobserved_region_occupancy_probability(
-      params.occupancy_integrator_params
-          .unobserved_region_occupancy_probability);
-  occupancy_integrator().occupied_region_half_width_m(
-      params.occupancy_integrator_params.occupied_region_half_width_m);
-  lidar_occupancy_integrator().occupied_region_half_width_m(
-      params.occupancy_integrator_params.occupied_region_half_width_m);
-
-  // ======= VIEW CALCULATOR =======
-  tsdf_integrator().view_calculator().raycast_subsampling_factor(
-      params.view_calculator_params.raycast_subsampling_factor);
-  lidar_tsdf_integrator().view_calculator().raycast_subsampling_factor(
-      params.view_calculator_params.raycast_subsampling_factor);
-  tsdf_integrator().view_calculator().workspace_bounds_type(
-      params.view_calculator_params.workspace_bounds_type);
-  tsdf_integrator().view_calculator().workspace_bounds_min_corner_m(
-      Vector3f(params.view_calculator_params.workspace_bounds_min_corner_x_m,
-               params.view_calculator_params.workspace_bounds_min_corner_y_m,
-               params.view_calculator_params.workspace_bounds_min_height_m));
-  tsdf_integrator().view_calculator().workspace_bounds_max_corner_m(
-      Vector3f(params.view_calculator_params.workspace_bounds_max_corner_x_m,
-               params.view_calculator_params.workspace_bounds_max_corner_y_m,
-               params.view_calculator_params.workspace_bounds_max_height_m));
-  color_integrator().view_calculator().raycast_subsampling_factor(
-      params.view_calculator_params.raycast_subsampling_factor);
-  color_integrator().view_calculator().workspace_bounds_type(
-      params.view_calculator_params.workspace_bounds_type);
-  color_integrator().view_calculator().workspace_bounds_min_corner_m(
-      Vector3f(params.view_calculator_params.workspace_bounds_min_corner_x_m,
-               params.view_calculator_params.workspace_bounds_min_corner_y_m,
-               params.view_calculator_params.workspace_bounds_min_height_m));
-  color_integrator().view_calculator().workspace_bounds_max_corner_m(
-      Vector3f(params.view_calculator_params.workspace_bounds_max_corner_x_m,
-               params.view_calculator_params.workspace_bounds_max_corner_y_m,
-               params.view_calculator_params.workspace_bounds_max_height_m));
-  feature_integrator().view_calculator().raycast_subsampling_factor(
-      params.view_calculator_params.raycast_subsampling_factor);
-  feature_integrator().view_calculator().workspace_bounds_type(
-      params.view_calculator_params.workspace_bounds_type);
-  feature_integrator().view_calculator().workspace_bounds_min_corner_m(
-      Vector3f(params.view_calculator_params.workspace_bounds_min_corner_x_m,
-               params.view_calculator_params.workspace_bounds_min_corner_y_m,
-               params.view_calculator_params.workspace_bounds_min_height_m));
-  feature_integrator().view_calculator().workspace_bounds_max_corner_m(
-      Vector3f(params.view_calculator_params.workspace_bounds_max_corner_x_m,
-               params.view_calculator_params.workspace_bounds_max_corner_y_m,
-               params.view_calculator_params.workspace_bounds_max_height_m));
-
-  // ======= MESH INTEGRATOR =======
-  color_mesh_integrator().min_weight(
-      params.mesh_integrator_params.mesh_integrator_min_weight);
-  color_mesh_integrator().weld_vertices(
-      params.mesh_integrator_params.mesh_integrator_weld_vertices);
-  feature_mesh_integrator().min_weight(
-      params.mesh_integrator_params.mesh_integrator_min_weight);
-  feature_mesh_integrator().weld_vertices(
-      params.mesh_integrator_params.mesh_integrator_weld_vertices);
-
-  // ======= FLAT MESH INTEGRATOR =======
-  color_flat_mesh_integrator().min_weight(
-      params.mesh_integrator_params.mesh_integrator_min_weight);
-  color_flat_mesh_integrator().max_num_triangles(
-      params.mesh_integrator_params.mesh_integrator_max_flat_mesh_triangles);
-  feature_flat_mesh_integrator().min_weight(
-      params.mesh_integrator_params.mesh_integrator_min_weight);
-  feature_flat_mesh_integrator().max_num_triangles(
-      params.mesh_integrator_params.mesh_integrator_max_flat_mesh_triangles);
-
-  // ======= DECAY INTEGRATOR (TSDF/OCCUPANCY)=======
-  tsdf_decay_integrator().deallocate_decayed_blocks(
-      params.decay_integrator_base_params
-          .decay_integrator_deallocate_decayed_blocks);
-  occupancy_decay_integrator().deallocate_decayed_blocks(
-      params.decay_integrator_base_params
-          .decay_integrator_deallocate_decayed_blocks);
-
-  // ======= TSDF DECAY INTEGRATOR =======
-  tsdf_decay_integrator().decay_factor(
-      params.tsdf_decay_integrator_params.tsdf_decay_factor);
-  tsdf_decay_integrator().decayed_weight_threshold(
-      params.tsdf_decay_integrator_params.tsdf_decayed_weight_threshold);
-  tsdf_decay_integrator().set_free_distance_on_decayed(
-      params.tsdf_decay_integrator_params.tsdf_set_free_distance_on_decayed);
-  tsdf_decay_integrator().free_distance_vox(
-      params.tsdf_decay_integrator_params.tsdf_decayed_free_distance_vox);
-
-  // ======= OCCUPANCY DECAY INTEGRATOR =======
-  occupancy_decay_integrator().free_region_decay_probability(
-      params.occupancy_decay_integrator_params.free_region_decay_probability);
-  occupancy_decay_integrator().occupied_region_decay_probability(
-      params.occupancy_decay_integrator_params
-          .occupied_region_decay_probability);
-  occupancy_decay_integrator().decay_to_free(
-      params.occupancy_decay_integrator_params.occupancy_decay_to_free);
-
-  // ======= FREESPACE INTEGRATOR =======
-  freespace_integrator().max_tsdf_distance_for_occupancy_m(
-      params.freespace_integrator_params.max_tsdf_distance_for_occupancy_m);
-  freespace_integrator().max_unobserved_to_keep_consecutive_occupancy_ms(
-      params.freespace_integrator_params
-          .max_unobserved_to_keep_consecutive_occupancy_ms);
-  freespace_integrator().min_duration_since_occupied_for_freespace_ms(
-      params.freespace_integrator_params
-          .min_duration_since_occupied_for_freespace_ms);
-  freespace_integrator().min_consecutive_occupancy_duration_for_reset_ms(
-      params.freespace_integrator_params
-          .min_consecutive_occupancy_duration_for_reset_ms);
-  freespace_integrator().check_neighborhood(
-      params.freespace_integrator_params.check_neighborhood);
-  freespace_integrator().initialize_to_high_confidence_freespace(
-      params.freespace_integrator_params
-          .initialize_to_high_confidence_freespace);
+  integrators_.setMapperParams(params);
 }
 
 TsdfLayer& Mapper::tsdf_layer() {
@@ -384,7 +140,8 @@ void Mapper::decayOccupancyAllVoxels() {
 
 void Mapper::clearTsdfInsideShapes(const std::vector<BoundingShape>& shapes) {
   const std::vector<Index3D> updated_blocks =
-      tsdf_shape_clearer_.clear(shapes, layers_.getPtr<TsdfLayer>());
+      integrators_.tsdf_shape_clearer.clear(shapes,
+                                            layers_.getPtr<TsdfLayer>());
   blocks_to_update_tracker_.addBlocksToUpdate(updated_blocks);
 }
 
@@ -440,8 +197,8 @@ void Mapper::updateFlatColorMeshGeometryOnly() {
   if (!hasTsdfLayer(projective_layer_type_)) return;
   timing::Timer timer("mapper/update_flat_mesh");
   const auto block_indices = layers_.get<TsdfLayer>().getAllBlockIndices();
-  color_flat_mesh_integrator_.integrateBlocks(layers_.get<TsdfLayer>(),
-                                              block_indices, &flat_color_mesh_);
+  integrators_.color_flat_mesh_integrator.integrateBlocks(
+      layers_.get<TsdfLayer>(), block_indices, &flat_color_mesh_);
 }
 
 void Mapper::updateFlatColorMeshGeometryOnly(const Camera& camera,
@@ -453,8 +210,8 @@ void Mapper::updateFlatColorMeshGeometryOnly(const Camera& camera,
   const auto block_indices =
       getFrustumFilteredIndices(camera, T_L_C, max_depth);
   frustum_timer.Stop();
-  color_flat_mesh_integrator_.integrateBlocks(layers_.get<TsdfLayer>(),
-                                              block_indices, &flat_color_mesh_);
+  integrators_.color_flat_mesh_integrator.integrateBlocks(
+      layers_.get<TsdfLayer>(), block_indices, &flat_color_mesh_);
 }
 
 void Mapper::updateEsdf(UpdateFullLayer update_full_layer) {
@@ -466,16 +223,17 @@ void Mapper::updateEsdf(UpdateFullLayer update_full_layer) {
       getBlocksToUpdate(BlocksToUpdateType::kEsdf, update_full_layer);
 
   if (projective_layer_type_ == ProjectiveLayerType::kTsdfWithFreespace) {
-    esdf_integrator_.integrateBlocks(
+    integrators_.esdf_integrator.integrateBlocks(
         layers_.get<TsdfLayer>(), layers_.get<FreespaceLayer>(),
         blocks_to_update, layers_.getPtr<EsdfLayer>());
   } else if (projective_layer_type_ == ProjectiveLayerType::kTsdf) {
-    esdf_integrator_.integrateBlocks(layers_.get<TsdfLayer>(), blocks_to_update,
-                                     layers_.getPtr<EsdfLayer>());
+    integrators_.esdf_integrator.integrateBlocks(layers_.get<TsdfLayer>(),
+                                                 blocks_to_update,
+                                                 layers_.getPtr<EsdfLayer>());
   } else if (projective_layer_type_ == ProjectiveLayerType::kOccupancy) {
-    esdf_integrator_.integrateBlocks(layers_.get<OccupancyLayer>(),
-                                     blocks_to_update,
-                                     layers_.getPtr<EsdfLayer>());
+    integrators_.esdf_integrator.integrateBlocks(layers_.get<OccupancyLayer>(),
+                                                 blocks_to_update,
+                                                 layers_.getPtr<EsdfLayer>());
   }
 
   blocks_to_update_tracker_.markBlocksAsUpdated(BlocksToUpdateType::kEsdf);
@@ -492,31 +250,31 @@ void Mapper::updateEsdfSlice(UpdateFullLayer update_full_layer,
 
   if (ground_plane) {
     if (projective_layer_type_ == ProjectiveLayerType::kTsdfWithFreespace) {
-      esdf_integrator_.integrateSlice(
+      integrators_.esdf_integrator.integrateSlice(
           layers_.get<TsdfLayer>(), layers_.get<FreespaceLayer>(),
           blocks_to_update, ground_plane.value(), layers_.getPtr<EsdfLayer>());
     } else if (projective_layer_type_ == ProjectiveLayerType::kTsdf) {
-      esdf_integrator_.integrateSlice(layers_.get<TsdfLayer>(),
-                                      blocks_to_update, ground_plane.value(),
-                                      layers_.getPtr<EsdfLayer>());
+      integrators_.esdf_integrator.integrateSlice(
+          layers_.get<TsdfLayer>(), blocks_to_update, ground_plane.value(),
+          layers_.getPtr<EsdfLayer>());
     } else if (projective_layer_type_ == ProjectiveLayerType::kOccupancy) {
-      esdf_integrator_.integrateSlice(layers_.get<OccupancyLayer>(),
-                                      blocks_to_update, ground_plane.value(),
-                                      layers_.getPtr<EsdfLayer>());
+      integrators_.esdf_integrator.integrateSlice(
+          layers_.get<OccupancyLayer>(), blocks_to_update, ground_plane.value(),
+          layers_.getPtr<EsdfLayer>());
     }
   } else {
     if (projective_layer_type_ == ProjectiveLayerType::kTsdfWithFreespace) {
-      esdf_integrator_.integrateSlice(
+      integrators_.esdf_integrator.integrateSlice(
           layers_.get<TsdfLayer>(), layers_.get<FreespaceLayer>(),
           blocks_to_update, layers_.getPtr<EsdfLayer>());
     } else if (projective_layer_type_ == ProjectiveLayerType::kTsdf) {
-      esdf_integrator_.integrateSlice(layers_.get<TsdfLayer>(),
-                                      blocks_to_update,
-                                      layers_.getPtr<EsdfLayer>());
+      integrators_.esdf_integrator.integrateSlice(layers_.get<TsdfLayer>(),
+                                                  blocks_to_update,
+                                                  layers_.getPtr<EsdfLayer>());
     } else if (projective_layer_type_ == ProjectiveLayerType::kOccupancy) {
-      esdf_integrator_.integrateSlice(layers_.get<OccupancyLayer>(),
-                                      blocks_to_update,
-                                      layers_.getPtr<EsdfLayer>());
+      integrators_.esdf_integrator.integrateSlice(layers_.get<OccupancyLayer>(),
+                                                  blocks_to_update,
+                                                  layers_.getPtr<EsdfLayer>());
     }
   }
   blocks_to_update_tracker_.markBlocksAsUpdated(BlocksToUpdateType::kEsdf);
@@ -548,10 +306,10 @@ void Mapper::markUnobservedTsdfFreeInsideRadius(const Vector3f& center,
   CHECK_GT(radius, 0.0f);
   std::vector<Index3D> updated_blocks;
   if (hasTsdfLayer(projective_layer_type_)) {
-    tsdf_integrator_.markUnobservedFreeInsideRadius(
+    integrators_.tsdf_integrator.markUnobservedFreeInsideRadius(
         center, radius, layers_.getPtr<TsdfLayer>(), &updated_blocks);
   } else if (projective_layer_type_ == ProjectiveLayerType::kOccupancy) {
-    occupancy_integrator_.markUnobservedFreeInsideRadius(
+    integrators_.occupancy_integrator.markUnobservedFreeInsideRadius(
         center, radius, layers_.getPtr<OccupancyLayer>(), &updated_blocks);
   }
 
@@ -767,31 +525,18 @@ parameters::ParameterTreeNode Mapper::getParameterTree(
     const std::string& name_remap) const {
   using parameters::ParameterTreeNode;
   const std::string name = (name_remap.empty()) ? "mapper" : name_remap;
-  return ParameterTreeNode(
-      name,
-      {ParameterTreeNode("voxel_size_m", voxel_size_m_),
-       ParameterTreeNode("projective_layer_type", projective_layer_type_),
-       ParameterTreeNode("esdf_mode", esdf_mode_),
-       ParameterTreeNode("do_depth_preprocessing", do_depth_preprocessing_),
-       ParameterTreeNode("depth_preprocessing_num_dilations",
-                         depth_preprocessing_num_dilations_),
-       tsdf_integrator_.getParameterTree("camera_tsdf_integrator"),
-       lidar_tsdf_integrator_.getParameterTree("lidar_tsdf_integrator"),
-       color_integrator_.getParameterTree(),
-       feature_integrator_.getParameterTree(),
-       occupancy_integrator_.getParameterTree("camera_occupancy_integrator"),
-       lidar_occupancy_integrator_.getParameterTree(
-           "lidar_occupancy_integrator"),
-       esdf_integrator_.getParameterTree(),
-       color_mesh_integrator_.getParameterTree(),
-       feature_mesh_integrator_.getParameterTree(),
-       color_flat_mesh_integrator_.getParameterTree(
-           "color_flat_mesh_integrator"),
-       feature_flat_mesh_integrator_.getParameterTree(
-           "feature_flat_mesh_integrator"),
-       occupancy_decay_integrator_.getParameterTree(),
-       tsdf_decay_integrator_.getParameterTree(),
-       freespace_integrator_.getParameterTree()});
+  std::vector<ParameterTreeNode> children = {
+      ParameterTreeNode("voxel_size_m", voxel_size_m_),
+      ParameterTreeNode("projective_layer_type", projective_layer_type_),
+      ParameterTreeNode("esdf_mode", esdf_mode_),
+      ParameterTreeNode("do_depth_preprocessing", do_depth_preprocessing_),
+      ParameterTreeNode("depth_preprocessing_num_dilations",
+                        depth_preprocessing_num_dilations_)};
+  const std::vector<ParameterTreeNode> integrator_nodes =
+      integrators_.getParameterTreeNodes();
+  children.insert(children.end(), integrator_nodes.begin(),
+                  integrator_nodes.end());
+  return ParameterTreeNode(name, children);
 }
 
 std::string Mapper::getParametersAsString() const {

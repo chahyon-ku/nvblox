@@ -214,8 +214,10 @@ datasets::DataLoadResult Fuser<SensorType, SensorDataType>::integrateFrame(
   timing::Rates::tick("fuser/integrate_frame");
   timing::Timer timer_file("fuser/file_loading");
 
-  // Load data - with optional color frame, timestamp, and motion compensation
-  // data
+  // Load data - with optional color frame, timestamp, motion compensation
+  // data, and per-camera binary masks.
+  const bool depth_mask_loaded = data_loader_->provides_depth_mask();
+  const bool color_mask_loaded = data_loader_->provides_color_mask();
   datasets::DataLoadResult load_result = data_loader_->loadNext(
       sensor_data_.get(), T_L_S_.get(), sensor_.get(),
       data_loader_->provides_color() ? color_frame_.get() : nullptr,
@@ -226,7 +228,10 @@ datasets::DataLoadResult Fuser<SensorType, SensorDataType>::integrateFrame(
           : nullptr,
       data_loader_->provides_lidar_scan_data() ? T_L_S_scanEnd_.get() : nullptr,
       data_loader_->provides_lidar_scan_data() ? scan_duration_ms_.get()
-                                               : nullptr);
+                                               : nullptr,
+      depth_mask_loaded ? &depth_mask_frame_ : nullptr,
+      color_mask_loaded ? &color_mask_frame_ : nullptr);
+
   timer_file.Stop();
 
   // We couldn't load this data frame.
@@ -264,9 +269,20 @@ datasets::DataLoadResult Fuser<SensorType, SensorDataType>::integrateFrame(
             std::nullopt, std::nullopt, frame_timestamp_ms);
       }
     } else {
-      // Integrate depth image.
-      multi_mapper_->integrateDepth(*sensor_data_, *T_L_S_, *sensor_,
-                                    frame_timestamp_ms);
+      // Mask only applies in static mode; dynamic mode uses the dynamics
+      // detector instead.
+      if (depth_mask_loaded) {
+        CHECK(!isDynamicMapping(mapping_type_))
+            << "depth_mask is not supported in dynamic mapping mode.";
+        multi_mapper_->background_mapper()->integrateDepth(
+            MaskedDepthImageConstView(
+                *sensor_data_, ImageView<const uint8_t>(depth_mask_frame_),
+                data_loader_->mask_mode()),
+            *T_L_S_, *sensor_);
+      } else {
+        multi_mapper_->integrateDepth(*sensor_data_, *T_L_S_, *sensor_,
+                                      frame_timestamp_ms);
+      }
     }
     timer_integrate.Stop();
 
@@ -284,7 +300,19 @@ datasets::DataLoadResult Fuser<SensorType, SensorDataType>::integrateFrame(
     CHECK_NOTNULL(color_camera_);
     timing::Timer timer_integrate_color("fuser/integrate_color");
     timing::Rates::tick("fuser/integrate_color");
-    multi_mapper_->integrateColor(*color_frame_, *T_L_C_, *color_camera_);
+    // Mask only applies in static mode; dynamic mode uses the dynamics
+    // detector instead.
+    if (color_mask_loaded) {
+      CHECK(!isDynamicMapping(mapping_type_))
+          << "color_mask is not supported in dynamic mapping mode.";
+      multi_mapper_->background_mapper()->integrateColor(
+          MaskedColorImageConstView(*color_frame_,
+                                    ImageView<const uint8_t>(color_mask_frame_),
+                                    data_loader_->mask_mode()),
+          *T_L_C_, *color_camera_);
+    } else {
+      multi_mapper_->integrateColor(*color_frame_, *T_L_C_, *color_camera_);
+    }
     timer_integrate_color.Stop();
   }
 
@@ -524,10 +552,12 @@ std::unique_ptr<CameraFuser> createFuser(const std::string& color_image_dir,
                                          const std::string& frames_meta_file,
                                          bool init_from_gflags,
                                          bool fit_to_z_plane,
-                                         const std::string& output_dir) {
-  auto data_loader = DataLoader::create(
-      color_image_dir, depth_image_dir, frames_meta_file,
-      false /* if use multithread*/, fit_to_z_plane, output_dir);
+                                         const std::string& output_dir,
+                                         const std::string& exclude_mask_dir) {
+  auto data_loader =
+      DataLoader::create(color_image_dir, depth_image_dir, frames_meta_file,
+                         false /* if use multithread*/, fit_to_z_plane,
+                         output_dir, exclude_mask_dir);
   if (!data_loader) {
     return std::unique_ptr<CameraFuser>();
   }

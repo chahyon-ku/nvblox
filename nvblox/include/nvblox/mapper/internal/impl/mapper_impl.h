@@ -118,7 +118,7 @@ void Mapper::integrateColor(const ColorImage& color_frame,
 
   if (hasTsdfLayer(projective_layer_type_)) {
     std::vector<Index3D> updated_blocks;
-    color_integrator_.integrateFrame(
+    integrators_.color_integrator.integrateFrame(
         MaskedColorImageConstView(color_frame, kMaskActiveEverywhere),
         MaskedDepthImageConstView(depth_frame, kMaskActiveEverywhere), T_L_C,
         sensor, layers_.get<TsdfLayer>(), layers_.getPtr<ColorLayer>(),
@@ -140,7 +140,7 @@ void Mapper::integrateColor(const MaskedColorImageConstView& color_frame,
   // Color is only integrated for Tsdf layers (not for occupancy)
   if (hasTsdfLayer(projective_layer_type_)) {
     std::vector<Index3D> updated_blocks;
-    color_integrator_.integrateFrame(
+    integrators_.color_integrator.integrateFrame(
         color_frame, T_L_C, sensor, layers_.get<TsdfLayer>(),
         layers_.getPtr<ColorLayer>(), &updated_blocks);
 
@@ -161,7 +161,7 @@ void Mapper::integrateFeatures(const MaskedFeatureImageConstView& feature_frame,
   // Features are only integrated for Tsdf layers (not for occupancy)
   if (hasTsdfLayer(projective_layer_type_)) {
     std::vector<Index3D> updated_blocks;
-    feature_integrator_.integrateFrame(
+    integrators_.feature_integrator.integrateFrame(
         feature_frame, T_L_C, sensor, layers_.get<TsdfLayer>(),
         layers_.getPtr<FeatureLayer>(), &updated_blocks);
 
@@ -206,7 +206,7 @@ void Mapper::updateFreespace(
   const std::vector<Index3D> blocks_to_update =
       getBlocksToUpdate(BlocksToUpdateType::kFreespace, update_full_layer);
 
-  freespace_integrator_.updateFreespaceLayer(
+  integrators_.freespace_integrator.updateFreespaceLayer(
       blocks_to_update, update_time_ms, layers_.get<TsdfLayer>(),
       view_to_update, layers_.getPtr<FreespaceLayer>());
 
@@ -240,9 +240,9 @@ void Mapper::decayTsdfInternal(
 
   // Decay
   std::vector<Index3D> removed_blocks =
-      tsdf_decay_integrator_.decay<SensorType>(layers_.getPtr<TsdfLayer>(),
-                                               std::nullopt, inclusion_data,
-                                               *cuda_stream_);
+      integrators_.tsdf_decay_integrator.decay<SensorType>(
+          layers_.getPtr<TsdfLayer>(), std::nullopt, inclusion_data,
+          *cuda_stream_);
 
   // Clear the blocks that got removed in the tsdf layer also in the esdf,
   // freespace and mesh layers.
@@ -277,7 +277,7 @@ void Mapper::decayOccupancyInternal(
 
   // Decay
   std::vector<Index3D> removed_blocks =
-      occupancy_decay_integrator_.decay<SensorType>(
+      integrators_.occupancy_decay_integrator.decay<SensorType>(
           layers_.getPtr<OccupancyLayer>(), std::nullopt, inclusion_data,
           *cuda_stream_);
 
@@ -313,11 +313,11 @@ void Mapper::updateFlatMeshImpl(const std::vector<Index3D>& block_indices) {
                 "Unsupported appearance voxel type for flat mesh");
   using AppearanceLayerType = VoxelBlockLayer<AppearanceVoxelType>;
   if constexpr (std::is_same_v<AppearanceVoxelType, ColorVoxel>) {
-    color_flat_mesh_integrator_.integrateBlocks(
+    integrators_.color_flat_mesh_integrator.integrateBlocks(
         layers_.get<TsdfLayer>(), layers_.get<AppearanceLayerType>(),
         block_indices, &flat_color_mesh_);
   } else {
-    feature_flat_mesh_integrator_.integrateBlocks(
+    integrators_.feature_flat_mesh_integrator.integrateBlocks(
         layers_.get<TsdfLayer>(), layers_.get<AppearanceLayerType>(),
         block_indices, &flat_feature_mesh_);
   }

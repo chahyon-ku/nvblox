@@ -187,10 +187,10 @@ TEST_F(DatasetLidarPLYTest, RoundTrip) {
   Lidar loaded_lidar;
   Time loaded_frame_timestamp_ms, loaded_scan_duration_ms;
 
-  auto result =
-      loader->loadNext(&loaded_pointcloud, &loaded_pose, &loaded_lidar, nullptr,
-                       nullptr, nullptr, &loaded_frame_timestamp_ms,
-                       &loaded_next_pose, &loaded_scan_duration_ms);
+  auto result = loader->loadNext(&loaded_pointcloud, &loaded_pose,
+                                 &loaded_lidar, nullptr, nullptr, nullptr,
+                                 &loaded_frame_timestamp_ms, &loaded_next_pose,
+                                 &loaded_scan_duration_ms, nullptr, nullptr);
   ASSERT_EQ(result, datasets::DataLoadResult::kSuccess);
 
   // Verify the data matches

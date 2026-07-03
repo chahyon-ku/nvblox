@@ -34,6 +34,7 @@ bool load16BitDepthImage(
     const float scaling_factor = kDefaultUintDepthScaleFactor);
 bool load8BitColorImage(const std::string& filename,
                         ColorImage* color_image_ptr);
+bool load8BitMonoImage(const std::string& filename, MonoImage* mono_image_ptr);
 
 using IndexToFilepathFunction = std::function<std::string(int image_idx)>;
 

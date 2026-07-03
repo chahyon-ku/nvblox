@@ -94,6 +94,7 @@ add_nvblox_shared_library(
   src/geometry/bounding_spheres.cpp
   src/geometry/workspace_bounds.cpp
   src/geometry/transforms.cpp
+  src/mapper/mapper_integrators.cpp
   src/mapper/mapper.cpp
   src/mapper/multi_mapper.cpp
   src/integrators/shape_clearer.cu

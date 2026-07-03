@@ -78,7 +78,9 @@ class DataLoader : public RgbdDataLoaderInterface {
                           Camera* color_camera_ptr,     // NOLINT
                           Time*,                        // NOLINT
                           Transform*,                   // NOLINT
-                          Time*) override;              // NOLINT
+                          Time*,                        // NOLINT
+                          MonoImage*,                   // NOLINT
+                          MonoImage*) override;         // NOLINT
 
  protected:
   const std::string base_path_;

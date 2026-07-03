@@ -79,6 +79,7 @@ limitations under the License.
 #include "nvblox/map/voxel_iterator.h"
 #include "nvblox/map/voxels.h"
 #include "nvblox/mapper/mapper.h"
+#include "nvblox/mapper/mapper_integrators.h"
 #include "nvblox/mapper/mapper_params.h"
 #include "nvblox/mapper/multi_mapper.h"
 #include "nvblox/mapper/multi_mapper_params.h"

@@ -1,9 +1,6 @@
 common --registry=https://bcr.bazel.build
 common --incompatible_disallow_empty_glob=False
 
-build --@rules_cuda//cuda:exec_platform="linux-x86_64"
-build --@rules_cuda//cuda:target_platform="linux-x86_64"
-build --@rules_cuda//cuda:version="13.0.0"
 build --cxxopt='-std=c++17'
 
 # CUDA device compiler warning configuration (matching CMake)
@@ -22,8 +19,6 @@ build --compiler=gcc_13
 # To use it: bazel build --config arm64
 build:arm64 --cpu=aarch64
 build:arm64 --features=-gold_linker # Disable gold as the aarch64 toolchain has its own linker.
-build:arm64 --@rules_cuda//cuda:exec_platform="linux-sbsa"
-build:arm64 --@rules_cuda//cuda:target_platform="linux-sbsa"
 
 # To use it: bazel build --config asan
 build:asan --strip=never
@@ -52,3 +47,6 @@ build:ubsan --copt -O1
 build:ubsan --copt -fno-omit-frame-pointer
 build:ubsan --linkopt -fsanitize=undefined
 build:ubsan --linkopt -lubsan
+
+# Your local preferences can be captured in this file.
+try-import %workspace%/.bazelrc.local
