@@ -1,17 +1,28 @@
 include(FetchContent)
+find_package(Git REQUIRED)
 FetchContent_Declare(
   ext_stdgpu
   SYSTEM
   PREFIX stdgpu
   GIT_REPOSITORY https://github.com/stotko/stdgpu.git
-  GIT_TAG        e10f6f3ccc9902d693af4380c3bcd188ec34a2e6
+  GIT_TAG        71a5aef26626eda47d15e5f577ca3b1538ff996a
   UPDATE_COMMAND ""
+  # stdgpu 71a5aef does not compile against CUDA 12: its Findthrust regex cannot parse a
+  # version.h whose #define carries a trailing comment, and to_address/destroy_at/construct_at/
+  # forward go ambiguous against CUDA 12's own. Both fixes are in the fetched tree, not here.
+  PATCH_COMMAND ${CMAKE_COMMAND}
+    -DGIT_EXECUTABLE=${GIT_EXECUTABLE}
+    -DSRC_DIR=<SOURCE_DIR>
+    -DPATCH_1=${CMAKE_CURRENT_LIST_DIR}/stdgpu_thrust_version_regex.patch
+    -DPATCH_2=${CMAKE_CURRENT_LIST_DIR}/stdgpu_fix_cuda12_6.patch
+    -P ${CMAKE_CURRENT_LIST_DIR}/apply_patches.cmake
 )
 
 # stdgpu build options
 set(STDGPU_BUILD_SHARED_LIBS OFF)
 set(STDGPU_BUILD_EXAMPLES OFF)
 set(STDGPU_BUILD_TESTS OFF)
+set(STDGPU_BUILD_BENCHMARKS OFF)
 set(STDGPU_ENABLE_CONTRACT_CHECKS OFF)
 
 set(STDGPU_BACKEND_DIRECTORY "cuda") # DO we need this?

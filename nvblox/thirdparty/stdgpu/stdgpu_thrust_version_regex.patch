@@ -1,0 +1,12 @@
+diff --git a/cmake/Findthrust.cmake b/cmake/Findthrust.cmake
+index 2837f84..d6c300f 100644
+--- a/cmake/Findthrust.cmake
++++ b/cmake/Findthrust.cmake
+@@ -13,6 +13,7 @@ if(THRUST_INCLUDE_DIR)
+          REGEX "#define THRUST_VERSION[ \t]+([0-9x]+)")
+ 
+     string(REGEX REPLACE "#define THRUST_VERSION[ \t]+" "" THRUST_VERSION_STRING ${THRUST_VERSION_STRING})
++    string(REGEX REPLACE "[^0-9].*$" "" THRUST_VERSION_STRING "${THRUST_VERSION_STRING}") # voxel_chain patch
+ 
+     math(EXPR THRUST_VERSION_MAJOR "${THRUST_VERSION_STRING} / 100000")
+     math(EXPR THRUST_VERSION_MINOR "(${THRUST_VERSION_STRING} / 100) % 1000")
